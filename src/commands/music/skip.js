@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { getVoiceConnection } = require('@discordjs/voice');
+const { queues } = require('./queue.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,9 +22,20 @@ module.exports = {
             return interaction.reply({ content: 'No music is currently playing!', ephemeral: true });
         }
 
+        const queue = queues.get(interaction.guild.id);
+        if (!queue || queue.length === 0) {
+            return interaction.reply({ content: 'There are no songs in the queue to skip!', ephemeral: true });
+        }
+
         try {
+            const currentSong = queue[0];
             player.stop();
-            await interaction.reply('⏭️ Skipped the current song!');
+            
+            if (queue.length > 1) {
+                await interaction.reply(`⏭️ Skipped **${currentSong.title}**! Now playing the next song.`);
+            } else {
+                await interaction.reply(`⏭️ Skipped **${currentSong.title}**! No more songs in queue.`);
+            }
         } catch (error) {
             console.error('Skip command error:', error);
             interaction.reply({ content: 'An error occurred while trying to skip the song.', ephemeral: true });
