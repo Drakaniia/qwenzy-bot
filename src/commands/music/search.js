@@ -4,7 +4,7 @@ const play = require('play-dl');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('search')
-        .setDescription('Search for music on YouTube')
+        .setDescription('Search for music on YouTube and select to play directly')
         .addStringOption(option =>
             option.setName('query')
                 .setDescription('Search query for YouTube videos')
@@ -31,7 +31,7 @@ module.exports = {
                 .addComponents(
                     new StringSelectMenuBuilder()
                         .setCustomId('music-select')
-                        .setPlaceholder('Select a song to play')
+                        .setPlaceholder('Select a song to play directly')
                         .addOptions(options)
                 );
 
@@ -65,7 +65,7 @@ module.exports = {
                 
                 if (selectedVideo) {
                     await selectInteraction.update({ 
-                        content: `🎵 Selected: **${selectedVideo.title}**. Adding to queue...`,
+                        content: `🎵 Selected: **${selectedVideo.title}**. Playing directly...`,
                         components: [],
                         embeds: []
                     });
@@ -73,11 +73,11 @@ module.exports = {
                     // Import the play command to handle the selected video
                     const playCommand = require('./play.js');
                     
-                    // Create a mock interaction with the video URL
+                    // Create a mock interaction with the video title for search
                     const mockInteraction = {
                         ...interaction,
                         options: {
-                            getString: () => selectedVideo.url
+                            getString: () => selectedVideo.title
                         },
                         member: interaction.member,
                         guild: interaction.guild,

@@ -1,0 +1,8 @@
+
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" fill="#1e1e1e"/>
+  <text x="64" y="40" font-family="monospace" font-size="14" fill="#569cd6" text-anchor="middle">&lt;/&gt;</text>
+  <text x="64" y="65" font-family="monospace" font-size="12" fill="#4ec9b0" text-anchor="middle">{}</text>
+  <text x="64" y="90" font-family="monospace" font-size="12" fill="#dcdcaa" text-anchor="middle">function()</text>
+  <text x="64" y="110" font-family="monospace" font-size="10" fill="#ce9178" text-anchor="middle">// code</text>
+</svg>
