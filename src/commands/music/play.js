@@ -23,11 +23,17 @@ module.exports = {
 
             let videoInfo;
             
+            // Add delay to prevent rate limiting
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
             // Always search for the query (even if it's a URL)
             const searchResults = await play.search(query, { limit: 1 });
             if (searchResults.length === 0) {
                 return interaction.followUp({ content: 'No results found for your search!', ephemeral: true });
             }
+            
+            // Add another delay before getting video info
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             videoInfo = await play.video_info(searchResults[0].url);
 
@@ -80,7 +86,17 @@ module.exports = {
 
         } catch (error) {
             console.error('Play command error:', error);
-            interaction.followUp({ content: 'An error occurred while trying to play the music.', ephemeral: true });
+            
+            let errorMessage = 'An error occurred while trying to play the music.';
+            
+            // Handle specific 429 rate limit error
+            if (error.message && error.message.includes('429')) {
+                errorMessage = '⚠️ YouTube rate limit reached. Please wait a moment and try again.';
+            } else if (error.message && error.message.includes('Captcha')) {
+                errorMessage = '⚠️ YouTube detected bot activity. Please try again in a few minutes.';
+            }
+            
+            interaction.followUp({ content: errorMessage, ephemeral: true });
         }
     },
 };

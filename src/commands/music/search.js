@@ -16,7 +16,10 @@ module.exports = {
             // Reply immediately to show the bot is working
             await interaction.reply({ content: '🔍 Searching...', ephemeral: false });
 
-            const searchResults = await play.search(query, { limit: 8 }); // Reduced from 10 to 8 for speed
+            // Add delay to prevent rate limiting
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const searchResults = await play.search(query, { limit: 5 }); // Further reduced to prevent 429
             
             if (searchResults.length === 0) {
                 return interaction.editReply({ content: 'No results found for your search!' });
@@ -148,10 +151,20 @@ module.exports = {
 
         } catch (error) {
             console.error('Search command error:', error);
+            
+            let errorMessage = 'An error occurred while searching for music.';
+            
+            // Handle specific 429 rate limit error
+            if (error.message && error.message.includes('429')) {
+                errorMessage = '⚠️ YouTube rate limit reached. Please wait a moment and try again.';
+            } else if (error.message && error.message.includes('Captcha')) {
+                errorMessage = '⚠️ YouTube detected bot activity. Please try again in a few minutes.';
+            }
+            
             if (interaction.replied || interaction.deferred) {
-                interaction.followUp({ content: 'An error occurred while searching for music.', ephemeral: true });
+                interaction.followUp({ content: errorMessage, ephemeral: true });
             } else {
-                interaction.reply({ content: 'An error occurred while searching for music.', ephemeral: true });
+                interaction.reply({ content: errorMessage, ephemeral: true });
             }
         }
     },
