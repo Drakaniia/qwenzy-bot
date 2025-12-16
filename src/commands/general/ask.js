@@ -20,7 +20,7 @@ module.exports = {
         try {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
             // using gemini-2.0-flash as it is the current supported text model
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
             // Add personality to the status
             const result = await model.generateContent(`

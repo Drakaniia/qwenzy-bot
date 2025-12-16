@@ -58,7 +58,7 @@ for (const folder of commandFolders) {
 }
 
 // EVENTS
-client.once(Events.ClientReady, () => {
+client.once(Events.ClientReady, async () => {
     console.log(`[INIT] Logged in as ${client.user.tag}!`);
     console.log(`[INFO] Ready to compile some fun.`);
 
@@ -66,6 +66,16 @@ client.once(Events.ClientReady, () => {
         console.log('[INFO] 🧠 Gemini AI Key loaded successfully.');
     } else {
         console.log('[WARN] ⚠️ Gemini AI Key is MISSING in process.env!');
+    }
+
+    // Set bot avatar if BOT_AVATAR_URL is provided
+    if (process.env.BOT_AVATAR_URL) {
+        try {
+            await client.user.setAvatar(process.env.BOT_AVATAR_URL);
+            console.log('[INFO] 🖼️ Bot avatar updated successfully.');
+        } catch (error) {
+            console.error('[ERROR] Failed to set bot avatar:', error);
+        }
     }
 
     client.user.setActivity('/help | Debugging life', { type: 'PLAYING' });
