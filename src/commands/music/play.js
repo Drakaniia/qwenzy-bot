@@ -19,10 +19,27 @@ module.exports = {
             // Reply immediately to show the bot is working
             await interaction.reply({ content: '🔍 Searching...', ephemeral: false });
 
-            // Use global rate limiter for search
-            const searchResults = await rateLimiter.execute(async () => {
-                return await play.search(query, { limit: 5 });
-            });
+            // Use global rate limiter for search with retry logic
+            let searchResults;
+            let retryCount = 0;
+            const maxRetries = 3;
+            
+            while (retryCount < maxRetries) {
+                try {
+                    searchResults = await rateLimiter.execute(async () => {
+                        return await play.search(query, { limit: 5 });
+                    });
+                    break;
+                } catch (searchError) {
+                    retryCount++;
+                    if (searchError.message && searchError.message.includes('429') && retryCount < maxRetries) {
+                        console.log(`[SEARCH] Rate limit hit, retry ${retryCount}/${maxRetries} in 5 seconds...`);
+                        await new Promise(resolve => setTimeout(resolve, 5000 * retryCount)); // Exponential backoff
+                    } else {
+                        throw searchError;
+                    }
+                }
+            }
             
             if (searchResults.length === 0) {
                 return interaction.editReply({ content: 'No results found for your search!' });
@@ -130,26 +147,63 @@ module.exports = {
                         // play-dl v1.9.7+ should auto-detect ffmpeg-static when available
                         console.log('[VOICE] FFmpeg path available:', !!ffmpeg);
 
-                        const videoInfo = await rateLimiter.execute(async () => {
-                            return await play.video_info(selectedVideo.url);
-                        });
+                        // Get video info with retry logic
+                        let videoInfo;
+                        let infoRetryCount = 0;
+                        const maxInfoRetries = 3;
                         
-                        // Enhanced stream handling with fallbacks
+                        while (infoRetryCount < maxInfoRetries) {
+                            try {
+                                videoInfo = await rateLimiter.execute(async () => {
+                                    return await play.video_info(selectedVideo.url);
+                                });
+                                break;
+                            } catch (infoError) {
+                                infoRetryCount++;
+                                if (infoError.message && infoError.message.includes('429') && infoRetryCount < maxInfoRetries) {
+                                    console.log(`[VIDEO_INFO] Rate limit hit, retry ${infoRetryCount}/${maxInfoRetries} in 5 seconds...`);
+                                    await new Promise(resolve => setTimeout(resolve, 5000 * infoRetryCount));
+                                } else {
+                                    throw infoError;
+                                }
+                            }
+                        }
+                        
+                        // Enhanced stream handling with fallbacks and retry logic
                         let resource;
-                        try {
-                            const stream = await play.stream(videoInfo.url);
-                            const { stream: probeStream, type } = await demuxProbe(stream.stream);
-                            resource = createAudioResource(probeStream, { inputType: type });
-                            console.log('[VOICE] Using demuxed stream type:', type);
-                        } catch (probeError) {
-                            console.warn('[VOICE] demuxProbe failed, falling back to default stream:', probeError.message);
+                        let streamRetryCount = 0;
+                        const maxStreamRetries = 3;
+                        
+                        while (streamRetryCount < maxStreamRetries) {
                             try {
                                 const stream = await play.stream(videoInfo.url);
-                                resource = createAudioResource(stream.stream, { inputType: stream.type });
-                                console.log('[VOICE] Using fallback stream type:', stream.type);
-                            } catch (streamError) {
-                                console.error('[VOICE] All stream methods failed:', streamError.message);
-                                throw new Error('Failed to create audio stream from video');
+                                const { stream: probeStream, type } = await demuxProbe(stream.stream);
+                                resource = createAudioResource(probeStream, { inputType: type });
+                                console.log('[VOICE] Using demuxed stream type:', type);
+                                break;
+                            } catch (probeError) {
+                                streamRetryCount++;
+                                if (probeError.message && probeError.message.includes('429') && streamRetryCount < maxStreamRetries) {
+                                    console.log(`[STREAM] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 5 seconds...`);
+                                    await new Promise(resolve => setTimeout(resolve, 5000 * streamRetryCount));
+                                    continue;
+                                }
+                                
+                                console.warn('[VOICE] demuxProbe failed, falling back to default stream:', probeError.message);
+                                try {
+                                    const stream = await play.stream(videoInfo.url);
+                                    resource = createAudioResource(stream.stream, { inputType: stream.type });
+                                    console.log('[VOICE] Using fallback stream type:', stream.type);
+                                    break;
+                                } catch (streamError) {
+                                    if (streamError.message && streamError.message.includes('429') && streamRetryCount < maxStreamRetries) {
+                                        console.log(`[STREAM_FALLBACK] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 5 seconds...`);
+                                        await new Promise(resolve => setTimeout(resolve, 5000 * streamRetryCount));
+                                        continue;
+                                    }
+                                    console.error('[VOICE] All stream methods failed:', streamError.message);
+                                    throw new Error('Failed to create audio stream from video');
+                                }
                             }
                         }
                         const player = createAudioPlayer();
