@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType } = require('discord.js');
+const { getVoiceConnection } = require('@discordjs/voice');
 const play = require('play-dl');
 const rateLimiter = require('../../utils/rateLimiter');
 
@@ -11,6 +12,7 @@ module.exports = {
                 .setDescription('Search query for YouTube videos')
                 .setRequired(true)),
     async execute(interaction) {
+        const { getVoiceConnection } = require('@discordjs/voice');
         const query = interaction.options.getString('query');
         
         try {
@@ -62,7 +64,7 @@ module.exports = {
                 if (selectInteraction.user.id !== interaction.user.id) {
                     await selectInteraction.reply({
                         content: 'You can only use the search results that you requested!',
-                        ephemeral: true
+                        flags: [64] // 64 = EPHEMERAL flag
                     });
                     return;
                 }
@@ -120,12 +122,13 @@ module.exports = {
                                             });
                     // Direct playback without calling play command again
                     try {
-                        const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+                        const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
                         const ffmpeg = require('ffmpeg-static');
                         const { spawn } = require('child_process');
 
-                        // Set FFmpeg path for play-dl
-                        play.setFfmpegPath(ffmpeg);
+                        // Set FFmpeg path for play-dl (if needed in future versions)
+                        // play-dl v1.9.7+ should auto-detect ffmpeg-static when available
+                        console.log('[VOICE] FFmpeg path available:', !!ffmpeg);
 
                         const videoInfo = await rateLimiter.execute(async () => {
                             return await play.video_info(selectedVideo.url);
@@ -187,10 +190,7 @@ module.exports = {
 
                             connection.on('error', (error) => {
                                 console.error('[VOICE] Connection error:', error);
-                                selectInteraction.followUp({ 
-                                    content: '❌ Voice connection error occurred. Please try again.', 
-                                    ephemeral: true 
-                                });
+                                selectInteraction.followUp({ content: '❌ Voice connection error occurred. Please try again.', flags: [64] });
                             });
                         }
 
@@ -288,10 +288,7 @@ module.exports = {
                             errorMessage = '❌ Stream error: Unable to process audio from this video. Please try another song.';
                         }
                         
-                        await selectInteraction.followUp({ 
-                            content: errorMessage, 
-                            ephemeral: true 
-                        });
+                        await selectInteraction.followUp({ content: errorMessage, flags: [64] });
                         
                         if (connection) {
                             connection.destroy();
@@ -326,9 +323,9 @@ module.exports = {
             }
             
             if (interaction.replied || interaction.deferred) {
-                interaction.followUp({ content: errorMessage, ephemeral: true });
+                interaction.followUp({ content: errorMessage, flags: [64] });
             } else {
-                interaction.reply({ content: errorMessage, ephemeral: true });
+                interaction.reply({ content: errorMessage, flags: [64] });
             }
         }
     },

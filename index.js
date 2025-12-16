@@ -14,7 +14,24 @@ function validateDependencies() {
     }
 }
 
+// Validate voice dependencies specifically
+function validateVoiceDependencies() {
+    try {
+        // Test if we can create required components
+        const play = require('play-dl');
+        const ffmpegPath = require('ffmpeg-static');
+        console.log('[VOICE] ✅ play-dl and ffmpeg-static are available');
+
+        // play-dl should work with ffmpeg-static automatically
+        console.log('[VOICE] FFmpeg path:', ffmpegPath);
+    } catch (error) {
+        console.error('[ERROR] ❌ Voice dependency validation failed:', error.message);
+        console.log('[ERROR] Voice commands may not work properly!');
+    }
+}
+
 validateDependencies();
+validateVoiceDependencies();
 
 const { Client, Collection, GatewayIntentBits, Events } = require('discord.js');
 const fs = require('fs');
@@ -104,9 +121,7 @@ client.once(Events.ClientReady, async () => {
     try {
         const { generateDependencyReport } = require('@discordjs/voice');
         const ffmpeg = require('ffmpeg-static');
-        const play = require('play-dl');
         
-        play.setFfmpegPath(ffmpeg);
         console.log('[INFO] 🎵 Voice dependencies validated successfully.');
         console.log('[INFO] 📦 FFmpeg path:', ffmpeg);
         
@@ -144,10 +159,14 @@ client.on('interactionCreate', async interaction => {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
-        } else {
-            await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+        try {
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+            } else {
+                await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+            }
+        } catch (replyError) {
+            console.error('Failed to send error reply:', replyError);
         }
     }
 });
