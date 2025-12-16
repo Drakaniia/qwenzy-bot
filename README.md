@@ -3,11 +3,11 @@
 Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It features a "Programming Humor" personality and offers music, economy, AI capabilities, and more!
 
 ## 🎵 Music Commands
-- **`/play <query>`** - Play music from YouTube (supports URLs and search queries)
-- **`/search <query>`** - Search for music on YouTube and select from results
-- **`/queue`** - View the current music queue
-- **`/skip`** - Skip the currently playing song
-- **`/stop`** - Stop playing music and clear the queue
+- **`/play <query>`** - Search for music on YouTube and select to play directly
+- **`/pause`** - Pause the current playing music
+- **`/resume`** - Resume the paused music
+- **`/skip`** - Skip the current song and disconnect
+- **`/stop`** - Stop the music and leave the voice channel
 
 ## 🤖 General Commands
 - **`/ping`** - Check bot latency
@@ -56,7 +56,7 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
 
 5. **Start the bot**
    ```bash
-   node index.js
+   npm start
    ```
 
 ## 📋 Environment Variables
@@ -88,24 +88,31 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
 ### Docker
 ```bash
 docker build -t qweny-bot .
-docker run -d --name qweny-bot qweny-bot
+docker run -d --env-file .env --name qweny-bot qweny-bot
+```
+
+Or using docker-compose:
+```bash
+docker-compose up -d
 ```
 
 ## 🎵 Music Features
 
 The music system includes:
-- **YouTube Integration**: Search and play from YouTube's vast library
-- **Queue Management**: Add multiple songs to a queue with automatic playback
-- **Interactive Search**: Browse search results with a user-friendly dropdown
-- **Auto-Disconnect**: Automatically disconnects when queue is empty after 5 minutes
-- **Voice Channel Detection**: Ensures users are in voice channels before playing
+- **YouTube Integration**: Search and play from YouTube with a user-friendly dropdown selection
+- **Voice Channel Management**: Automatic permission checking and connection management
+- **Playback Controls**: Pause, resume, skip, and stop functionality
+- **FFmpeg Integration**: Proper audio processing using ffmpeg-static
+- **Rate Limiting**: Prevents YouTube API rate limiting with built-in rate limiter
+- **Connection Monitoring**: Proper state tracking and error handling
+- **Status Updates**: Bot status updates to show currently playing track
 
 ### How to Use Music Commands
 1. Join a voice channel
-2. Use `/search your song` to find music
-3. Select from the dropdown menu
-4. Or use `/play direct_url_or_search_query` for immediate playback
-5. Manage your queue with `/queue`, `/skip`, and `/stop`
+2. Use `/play your song query` to search for music
+3. Select from the dropdown menu that appears
+4. The music will play in your voice channel
+5. Use `/pause`, `/resume`, `/skip`, or `/stop` to control playback
 
 ## 🛠️ Bot Configuration
 
@@ -113,10 +120,12 @@ The music system includes:
 Make sure your bot has these permissions:
 - `Connect` - Join voice channels
 - `Speak` - Play audio
+- `View Channel` - View voice channels
 - `Read Messages` - Read channel messages
 - `Send Messages` - Send messages
 - `Embed Links` - Send rich embeds
 - `Use External Emojis` - Use custom emojis
+- `Manage Channels` (optional) - For advanced voice features
 
 ### Intents Required
 The bot requires these Discord intents:
@@ -141,9 +150,10 @@ The bot requires these Discord intents:
 
 ### Common Issues
 - **Commands not registering**: Ensure you've run `node deploy-commands.js`
-- **Music not playing**: Check that FFmpeg is installed and bot has voice permissions
+- **Music not playing**: Check that FFmpeg is installed, bot has voice permissions, and you're in a voice channel
 - **AI responses not working**: Verify your `GEMINI_API_KEY` is valid
 - **Bot disconnecting**: Check internet connection and Discord API status
+- **"Unknown interaction" errors**: These are typically caused by timeouts and are now properly handled
 
 ### Debug Mode
 Enable debug logging by setting `DEBUG=true` in your environment variables.
