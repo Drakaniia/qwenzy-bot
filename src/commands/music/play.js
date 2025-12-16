@@ -209,7 +209,7 @@ module.exports = {
                             console.error('[VOICE] Connection timeout:', error);
                             await selectInteraction.followUp({ 
                                 content: '❌ Failed to connect to voice channel. Please check my permissions and try again.', 
-                                ephemeral: true 
+                                flags: [64] 
                             });
                             connection.destroy();
                             return;
@@ -261,7 +261,7 @@ module.exports = {
                                 errorMessage = '❌ Rate limited: Too many requests. Please wait a moment and try again.';
                             }
                             
-                            selectInteraction.followUp({ content: errorMessage, ephemeral: true });
+                            selectInteraction.followUp({ content: errorMessage, flags: [64] });
                             connection.destroy();
                             selectInteraction.client.user.setActivity(null);
                         });
@@ -303,10 +303,17 @@ module.exports = {
 
             collector.on('end', (collected, reason) => {
                 if (reason === 'time') {
-                    interaction.editReply({ 
-                        components: [],
-                        content: 'Search selection timed out. Please run /search again.'
-                    }).catch(console.error);
+                    try {
+                        interaction.editReply({ 
+                            components: [],
+                            content: 'Search selection timed out. Please run /play again.'
+                        }).catch(() => {
+                            // If edit fails, the interaction may have expired
+                            console.log('[INFO] Interaction expired, could not edit reply');
+                        });
+                    } catch (error) {
+                        console.log('[INFO] Interaction expired or already handled');
+                    }
                 }
             });
 
@@ -320,12 +327,24 @@ module.exports = {
                 errorMessage = '⚠️ YouTube rate limit reached. Please wait a moment and try again.';
             } else if (error.message && error.message.includes('Captcha')) {
                 errorMessage = '⚠️ YouTube detected bot activity. Please try again in a few minutes.';
+            } else if (error.code === 10062) {
+                // Unknown interaction - interaction expired
+                console.log('[INFO] Interaction expired, cannot respond');
+                return;
             }
             
-            if (interaction.replied || interaction.deferred) {
-                interaction.followUp({ content: errorMessage, flags: [64] });
-            } else {
-                interaction.reply({ content: errorMessage, flags: [64] });
+            try {
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp({ content: errorMessage, flags: [64] });
+                } else {
+                    await interaction.reply({ content: errorMessage, flags: [64] });
+                }
+            } catch (replyError) {
+                if (replyError.code === 10062) {
+                    console.log('[INFO] Interaction expired, cannot send error message');
+                } else {
+                    console.error('Failed to send error message:', replyError);
+                }
             }
         }
     },
