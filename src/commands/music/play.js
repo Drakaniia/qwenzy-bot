@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } = require('@discordjs/voice');
 const play = require('play-dl');
+const rateLimiter = require('../../utils/rateLimiter');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -23,19 +24,19 @@ module.exports = {
 
             let videoInfo;
             
-            // Add delay to prevent rate limiting
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Use global rate limiter for search
+            const searchResults = await rateLimiter.execute(async () => {
+                return await play.search(query, { limit: 1 });
+            });
             
-            // Always search for the query (even if it's a URL)
-            const searchResults = await play.search(query, { limit: 1 });
             if (searchResults.length === 0) {
                 return interaction.followUp({ content: 'No results found for your search!', ephemeral: true });
             }
             
-            // Add another delay before getting video info
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            videoInfo = await play.video_info(searchResults[0].url);
+            // Use global rate limiter for video info
+            videoInfo = await rateLimiter.execute(async () => {
+                return await play.video_info(searchResults[0].url);
+            });
 
             const stream = await play.stream(videoInfo.url);
             const resource = createAudioResource(stream.stream, { inputType: stream.type });

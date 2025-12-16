@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType } = require('discord.js');
 const play = require('play-dl');
+const rateLimiter = require('../../utils/rateLimiter');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -16,10 +17,10 @@ module.exports = {
             // Reply immediately to show the bot is working
             await interaction.reply({ content: '🔍 Searching...', ephemeral: false });
 
-            // Add delay to prevent rate limiting
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            const searchResults = await play.search(query, { limit: 5 }); // Further reduced to prevent 429
+            // Use global rate limiter for search
+            const searchResults = await rateLimiter.execute(async () => {
+                return await play.search(query, { limit: 5 });
+            });
             
             if (searchResults.length === 0) {
                 return interaction.editReply({ content: 'No results found for your search!' });
@@ -85,7 +86,9 @@ module.exports = {
                             return;
                         }
 
-                        const videoInfo = await play.video_info(selectedVideo.url);
+                        const videoInfo = await rateLimiter.execute(async () => {
+                return await play.video_info(selectedVideo.url);
+            });
                         const stream = await play.stream(videoInfo.url);
                         const resource = createAudioResource(stream.stream, { inputType: stream.type });
                         const player = createAudioPlayer();
