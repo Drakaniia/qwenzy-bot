@@ -17,7 +17,7 @@ module.exports = {
         
         try {
             // Reply immediately to show the bot is working
-            await interaction.reply({ content: '🔍 Searching...', ephemeral: false });
+            await interaction.reply({ content: '🔍 Searching...', flags: [] });
 
             // Use global rate limiter for search with retry logic
             let searchResults;

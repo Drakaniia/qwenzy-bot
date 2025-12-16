@@ -11,7 +11,7 @@ module.exports = {
         if (!voiceChannel) {
             return await interaction.reply({
                 content: '❌ You need to be in a voice channel for me to join!',
-                ephemeral: true
+                flags: [64]
             });
         }
 
@@ -21,12 +21,12 @@ module.exports = {
             if (existingConnection.joinConfig.channelId === voiceChannel.id) {
                 return await interaction.reply({
                     content: `✅ I'm already in **${voiceChannel.name}**!`,
-                    ephemeral: true
+                    flags: [64]
                 });
             } else {
                 return await interaction.reply({
                     content: `❌ I'm already in **${existingConnection.joinConfig.channelId}**! Use \`/leave\` first or use \`/play\` to join your current channel.`,
-                    ephemeral: true
+                    flags: [64]
                 });
             }
         }
@@ -39,7 +39,7 @@ module.exports = {
         if (missingPermissions.length > 0) {
             return await interaction.reply({
                 content: `❌ I'm missing these permissions in **${voiceChannel.name}**: ${missingPermissions.map(p => `\`${p}\``).join(', ')}`,
-                ephemeral: true
+                flags: [64]
             });
         }
 
@@ -47,7 +47,7 @@ module.exports = {
         if (voiceChannel.full && !permissions.has('MOVE_MEMBERS')) {
             return await interaction.reply({
                 content: `❌ The voice channel **${voiceChannel.name}** is full and I don't have permission to move members!`,
-                ephemeral: true
+                flags: [64]
             });
         }
 

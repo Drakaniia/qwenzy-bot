@@ -11,7 +11,7 @@ module.exports = {
         if (!connection) {
             return await interaction.reply({
                 content: '❌ I\'m not in any voice channel!',
-                ephemeral: true
+                flags: [64]
             });
         }
 
@@ -31,7 +31,7 @@ module.exports = {
             
             await interaction.reply({
                 content: '❌ Failed to leave voice channel. Please try again.',
-                ephemeral: true
+                flags: [64]
             });
         }
     },
