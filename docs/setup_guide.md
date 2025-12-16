@@ -40,17 +40,19 @@ docker build --target production -t qwenzy-bot .
 
 ### Running the Bot with Docker
 ```bash
-# Run the bot container
-docker run -d --name qwenzy-bot --env-file .env qwenzy-bot
+# Run the bot container (requires .env file in the current directory)
+docker run -d --name qwenzy-bot --env-file .env -p 3000:3000 qwenzy-bot
 
 # Run with custom environment variables
-docker run -d --name qwenzy-bot -e DISCORD_TOKEN=your_token -e GEMINI_API_KEY=your_key -e CLIENT_ID=your_client_id -e GUILD_ID=your_guild_id qwenzy-bot
+docker run -d --name qwenzy-bot -e DISCORD_TOKEN=your_token -e GEMINI_API_KEY=your_key -e CLIENT_ID=your_client_id -e GUILD_ID=your_guild_id -e PORT=3000 -p 3000:3000 qwenzy-bot
 ```
 
 ### Running with Docker Compose (if you create a docker-compose.yml)
 ```bash
 docker-compose up -d
 ```
+
+> Note: The bot uses the PORT environment variable to determine which port to run on. By default, the Dockerfile exposes port 3000, which is the default value if PORT is not specified in your .env file.
 
 ## 6. Directory Structure
 ```
