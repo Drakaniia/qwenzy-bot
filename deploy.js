@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Deployment helper script for Wispbyte
+ * Deployment helper script for Render/Railway
  *
  * This script checks if all required environment variables are set
  * before starting the bot, which is helpful for deployment platforms.
@@ -9,7 +9,7 @@
 
 require('dotenv').config();
 
-console.log('🌱 Initializing Qwenzy Bot for Wispbyte deployment...');
+console.log('🌱 Initializing Qwenzy Bot for deployment...');
 
 // Check if required environment variables are present
 const requiredEnvVars = [
@@ -44,6 +44,6 @@ if (missingOptionalEnvVars.length > 0) {
 }
 
 console.log('🌐 Connecting to Discord...');
-console.log('💡 Bot is being deployed to Wispbyte for 24/7 uptime');
+console.log('💡 Bot is being deployed to Render/Railway');
 // Require the main index file to start the bot
 require('./index.js');

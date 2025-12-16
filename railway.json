@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "heroku/buildpacks:20"
+  },
+  "deploy": {
+    "restartPolicy": {
+      "type": "on-failure",
+      "maximumRetryCount": 3
+    }
+  }
+}

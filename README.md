@@ -20,33 +20,32 @@ See [docs/setup_guide.md](docs/setup_guide.md) for the detailed story of how thi
 
 ## Deployment
 
-### Deploying on Wispbyte (Recommended for 24/7 uptime)
+### Deploying on Render
 
-Wispbyte is recommended as the best option for free 24/7 Discord bot hosting. Follow these steps:
-
-1. Prepare your project files:
-   - Make sure all dependencies are listed in `package.json`
-   - Create a zip archive of your project (excluding `node_modules` and `.git`)
-
-2. Go to [Wispbyte](https://wispbyte.com/free-discord-bot-hosting)
-
-3. Upload your zipped project file
-
-4. Add your environment variables:
+1. Create a new Web Service on Render
+2. Connect your GitHub repository
+3. Set the build command to: `npm install`
+4. Set the start command to: `npm start`
+5. Add the required environment variables:
    - `DISCORD_TOKEN`: Your Discord bot token
    - `CLIENT_ID`: Your Discord application client ID
    - `GUILD_ID`: Your Discord guild/server ID (if needed)
    - `GEMINI_API_KEY`: Your Google Generative AI API key (if applicable)
 
-5. Start your bot through the Wispbyte dashboard
+### Deploying on Railway
+
+1. Create a new project on Railway
+2. Connect your GitHub repository or upload your code
+3. Railway will automatically detect the Node.js project
+4. Add the required environment variables in the Environment Variables section
+
+For optimal uptime with free hosting services, consider using dedicated Discord bot hosting platforms like Wispbyte or Bot-Hosting.net which are designed specifically for keeping Discord bots online 24/7.
 
 ### Environment Variables
 
-Make sure to set these environment variables on Wispbyte:
+Make sure to set these environment variables on your hosting platform:
 
 - `DISCORD_TOKEN` - Your Discord bot token
 - `CLIENT_ID` - Your Discord application client ID
 - `GUILD_ID` - Your Discord server ID (if using slash commands in a specific server)
 - `GEMINI_API_KEY` - Your Google Generative AI API key
-
-Wispbyte is designed specifically for Discord bots and will keep yours online 24/7 without sleeping, making it the optimal free solution for persistent bot hosting.

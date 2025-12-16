@@ -1,0 +1,19 @@
+services:
+- type: web
+  name: qwenzy-bot
+  env: node
+  region: frankfurt  # You can change this to the region closest to you
+  buildCommand: npm install
+  startCommand: npm start
+  healthCheckPath: /health
+  envVars:
+  - key: NODE_VERSION
+    value: 18  # Or whatever Node version you're using
+  - key: DISCORD_TOKEN  # Replace with your actual environment variable
+    sync: false  # This will be set in the Render dashboard
+  - key: CLIENT_ID  # Replace with your actual environment variable
+    sync: false  # This will be set in the Render dashboard
+  - key: GUILD_ID  # Replace with your actual environment variable
+    sync: false  # This will be set in the Render dashboard
+  - key: GEMINI_API_KEY  # Replace with your actual environment variable
+    sync: false  # This will be set in the Render dashboard
