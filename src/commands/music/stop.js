@@ -18,6 +18,8 @@ module.exports = {
 
         try {
             connection.destroy();
+            // Clear the bot's activity status when stopping
+            interaction.client.user.setActivity(null);
             await interaction.reply('🛑 Stopped the music and left the voice channel!');
         } catch (error) {
             console.error('Stop command error:', error);

@@ -4,8 +4,8 @@ const rateLimiter = require('../../utils/rateLimiter');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('search')
-        .setDescription('Search for music on YouTube and select to play directly')
+        .setName('choose')
+        .setDescription('Search for music and choose from results to play')
         .addStringOption(option =>
             option.setName('query')
                 .setDescription('Search query for YouTube videos')
@@ -27,7 +27,7 @@ module.exports = {
             }
 
             const options = searchResults.map((video, index) => ({
-                label: video.title.length > 80 ? video.title.substring(0, 77) + '...' : video.title, // Shorter labels
+                label: video.title.length > 80 ? video.title.substring(0, 77) + '...' : video.title,
                 description: `${video.durationFormatted} • ${video.channel.name}`,
                 value: video.url,
             }));
@@ -35,13 +35,13 @@ module.exports = {
             const row = new ActionRowBuilder()
                 .addComponents(
                     new StringSelectMenuBuilder()
-                        .setCustomId('music-select')
+                        .setCustomId('music-choose')
                         .setPlaceholder('Select a song to play')
                         .addOptions(options)
                 );
 
             const embed = {
-                title: '🔍 Search Results',
+                title: '🎵 Choose a Song',
                 description: `Found ${searchResults.length} results for "${query}"`,
                 color: 0x0099FF,
                 timestamp: new Date().toISOString(),
@@ -55,20 +55,20 @@ module.exports = {
 
             const collector = interaction.channel.createMessageComponentCollector({
                 componentType: ComponentType.StringSelect,
-                time: 30000 // Reduced timeout to 30 seconds
+                time: 30000
             });
 
             collector.on('collect', async (selectInteraction) => {
                 if (selectInteraction.user.id !== interaction.user.id) {
-                    await selectInteraction.reply({
-                        content: 'You can only use the search results that you requested!',
-                        ephemeral: true
+                    await selectInteraction.reply({ 
+                        content: 'You can only use the search results that you requested!', 
+                        ephemeral: true 
                     });
                     return;
                 }
 
                 const selectedVideo = searchResults.find(video => video.url === selectInteraction.values[0]);
-
+                
                 if (selectedVideo) {
                     // Check if user is in a voice channel before attempting to play
                     const voiceChannel = selectInteraction.member.voice.channel;
@@ -87,32 +87,53 @@ module.exports = {
                         embeds: []
                     });
 
-                    // Direct playback without calling play command again
+                    // Direct playback using rate limiter
                     try {
                         const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } = require('@discordjs/voice');
 
 
 
+                        // Use rate limiter for video info
                         const videoInfo = await rateLimiter.execute(async () => {
-                return await play.video_info(selectedVideo.url);
-            });
+                            return await play.video_info(selectedVideo.url);
+                        });
+                        
                         const stream = await play.stream(videoInfo.url);
                         const resource = createAudioResource(stream.stream, { inputType: stream.type });
                         const player = createAudioPlayer();
                         
                         let connection = getVoiceConnection(selectInteraction.guild.id);
                         if (!connection) {
-                            connection = joinVoiceChannel({
-                                channelId: voiceChannel.id,
-                                guildId: selectInteraction.guild.id,
-                                adapterCreator: selectInteraction.guild.voiceAdapterCreator,
-                            });
+                            console.log(`Creating new voice connection to channel: ${voiceChannel.name} (${voiceChannel.id})`);
+                            try {
+                                connection = joinVoiceChannel({
+                                    channelId: voiceChannel.id,
+                                    guildId: selectInteraction.guild.id,
+                                    adapterCreator: selectInteraction.guild.voiceAdapterCreator,
+                                });
+                                console.log(`Successfully joined voice channel: ${voiceChannel.name}`);
+                            } catch (error) {
+                                console.error('Failed to join voice channel:', error);
+                                await selectInteraction.followUp({ content: 'Failed to join voice channel. Check bot permissions.', ephemeral: true });
+                                return;
+                            }
+                        } else {
+                            console.log(`Using existing voice connection in channel: ${voiceChannel.name}`);
                         }
 
-                        player.play(resource);
-                        connection.subscribe(player);
+                        try {
+                            connection.subscribe(player);
+                            console.log('Player subscribed to connection');
+                            player.play(resource);
+                            console.log('Started playing audio resource');
+                        } catch (error) {
+                            console.error('Failed to play audio:', error);
+                            await selectInteraction.followUp({ content: 'Failed to play audio. Please try again.', ephemeral: true });
+                            return;
+                        }
 
                         player.on(AudioPlayerStatus.Playing, () => {
+                            console.log('Audio player is now playing');
                             // Update bot's activity status to show what's playing
                             selectInteraction.client.user.setActivity(videoInfo.video_details.title, { type: 0 }); // 0 is for "PLAYING"
 
@@ -130,10 +151,20 @@ module.exports = {
                             selectInteraction.followUp({ embeds: [embed] });
                         });
 
+                        player.on(AudioPlayerStatus.Buffering, () => {
+                            console.log('Audio player is buffering');
+                        });
+
+                        player.on(AudioPlayerStatus.AutoPaused, () => {
+                            console.log('Audio player auto-paused');
+                        });
+
                         player.on(AudioPlayerStatus.Idle, () => {
+                            console.log('Audio player is idle - will disconnect in 5 seconds');
                             setTimeout(() => {
                                 if (connection.state.subscription?.player?.state.status === 'idle') {
                                     connection.destroy();
+                                    console.log('Disconnected from voice channel');
                                 }
                             }, 5000);
 
@@ -144,14 +175,24 @@ module.exports = {
                         player.on('error', error => {
                             console.error('Audio player error:', error);
                             selectInteraction.followUp({ content: 'An error occurred while playing.', ephemeral: true });
-                            connection.destroy();
+                            if (connection) connection.destroy();
                             // Clear the bot's activity status when there's an error
                             selectInteraction.client.user.setActivity(null);
                         });
 
                     } catch (error) {
                         console.error('Playback error:', error);
-                        await selectInteraction.followUp({ content: 'An error occurred while playing the selected song.', ephemeral: true });
+
+                        let errorMessage = 'An error occurred while playing the selected song.';
+
+                        // Handle specific 429 rate limit error
+                        if (error.message && error.message.includes('429')) {
+                            errorMessage = '⚠️ YouTube rate limit reached. Please wait a moment and try again.';
+                        } else if (error.message && error.message.includes('Captcha')) {
+                            errorMessage = '⚠️ YouTube detected bot activity. Please try again in a few minutes.';
+                        }
+
+                        await selectInteraction.followUp({ content: errorMessage, ephemeral: true });
                         // Clear the bot's activity status when there's an error
                         selectInteraction.client.user.setActivity(null);
                     }
@@ -164,13 +205,13 @@ module.exports = {
                 if (reason === 'time') {
                     interaction.editReply({ 
                         components: [],
-                        content: 'Search selection timed out. Please run /search again.'
+                        content: 'Selection timed out. Please run /choose again.'
                     }).catch(console.error);
                 }
             });
 
         } catch (error) {
-            console.error('Search command error:', error);
+            console.error('Choose command error:', error);
             
             let errorMessage = 'An error occurred while searching for music.';
             

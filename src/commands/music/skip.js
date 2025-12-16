@@ -24,6 +24,8 @@ module.exports = {
         try {
             player.stop();
             connection.destroy();
+            // Clear the bot's activity status when skipping
+            interaction.client.user.setActivity(null);
             await interaction.reply('⏹️ Stopped the music and disconnected!');
         } catch (error) {
             console.error('Skip command error:', error);
