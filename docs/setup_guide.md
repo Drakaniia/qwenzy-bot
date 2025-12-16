@@ -26,11 +26,38 @@ We integrated Google's **Gemini AI** to give Qweny a brain.
 - Installed `@google/generative-ai`.
 - Created an `/ask` command that takes a user prompt, sends it to Gemini, and replies with a response in Qweny's sarcastic style.
 
-## 5. Directory Structure
+## 5. Docker Support 🐳
+Qweny Bot can be deployed using Docker for containerized deployment.
+
+### Building the Docker Image
+```bash
+# Build the Docker image
+docker build -t qwenzy-bot .
+
+# Build with production dependencies only
+docker build --target production -t qwenzy-bot .
+```
+
+### Running the Bot with Docker
+```bash
+# Run the bot container
+docker run -d --name qwenzy-bot --env-file .env qwenzy-bot
+
+# Run with custom environment variables
+docker run -d --name qwenzy-bot -e DISCORD_TOKEN=your_token -e GEMINI_API_KEY=your_key -e CLIENT_ID=your_client_id -e GUILD_ID=your_guild_id qwenzy-bot
+```
+
+### Running with Docker Compose (if you create a docker-compose.yml)
+```bash
+docker-compose up -d
+```
+
+## 6. Directory Structure
 ```
 qweny-bot/
 ├── index.js              # Main bot file
 ├── deploy-commands.js    # Script to register commands
+├── Dockerfile            # Docker configuration
 ├── .env                  # Secrets (Token, App ID, API Keys)
 ├── src/
 │   ├── commands/
@@ -43,3 +70,5 @@ qweny-bot/
 ## Troubleshooting
 - **Command not showing?** Ensure `deploy-commands.js` was run and the `GUILD_ID` in `.env` is correct.
 - **AI Error?** Check if `GEMINI_API_KEY` is valid in `.env`.
+- **Docker build fails?** Make sure you have Docker installed and the Docker daemon is running.
+- **Docker container exits immediately?** Verify that your `.env` file contains all required environment variables.
