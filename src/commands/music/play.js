@@ -70,7 +70,7 @@ module.exports = {
                 const selectedVideo = searchResults.find(video => video.url === selectInteraction.values[0]);
 
                 if (selectedVideo) {
-                    // Check if user is in a voice channel before attempting to play
+                    // Comprehensive permission and voice channel checks
                     const voiceChannel = selectInteraction.member.voice.channel;
                     if (!voiceChannel) {
                         await selectInteraction.update({
@@ -81,23 +81,74 @@ module.exports = {
                         return;
                     }
 
-                    await selectInteraction.update({
-                        content: `🎵 Playing: **${selectedVideo.title}**`,
-                        components: [],
-                        embeds: []
-                    });
+                    // Check bot permissions for voice channel
+                    const permissions = voiceChannel.permissionsFor(selectInteraction.client.user);
+                    if (!permissions.has('CONNECT') || !permissions.has('SPEAK')) {
+                        await selectInteraction.update({
+                            content: '❌ I need permission to connect and speak in your voice channel!',
+                            components: [],
+                            embeds: []
+                        });
+                        return;
+                    }
 
+                    // Check if voice channel is full
+                    if (voiceChannel.full && !permissions.has('MOVE_MEMBERS')) {
+                        await selectInteraction.update({
+                            content: '❌ The voice channel is full and I cannot move members!',
+                            components: [],
+                            embeds: []
+                        });
+                        return;
+                    }
+
+                    // Check if user is in the same voice channel as bot
+                    const existingConnection = getVoiceConnection(selectInteraction.guild.id);
+                    if (existingConnection && existingConnection.joinConfig.channelId !== voiceChannel.id) {
+                        await selectInteraction.update({
+                            content: '❌ I am already playing in another voice channel! Please use that channel or wait for me to finish.',
+                            components: [],
+                            embeds: []
+                        });
+                        return;
+                    }
+
+                    await selectInteraction.update({
+                                                content: `🔌 Connecting to voice channel... 🎵 **${selectedVideo.title}**`,
+                                                components: [],
+                                                embeds: []
+                                            });
                     // Direct playback without calling play command again
                     try {
-                        const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } = require('@discordjs/voice');
+                        const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
+                        const ffmpeg = require('ffmpeg-static');
+                        const { spawn } = require('child_process');
 
-
+                        // Set FFmpeg path for play-dl
+                        play.setFfmpegPath(ffmpeg);
 
                         const videoInfo = await rateLimiter.execute(async () => {
-                return await play.video_info(selectedVideo.url);
-            });
-                        const stream = await play.stream(videoInfo.url);
-                        const resource = createAudioResource(stream.stream, { inputType: stream.type });
+                            return await play.video_info(selectedVideo.url);
+                        });
+                        
+                        // Enhanced stream handling with fallbacks
+                        let resource;
+                        try {
+                            const stream = await play.stream(videoInfo.url);
+                            const { stream: probeStream, type } = await demuxProbe(stream.stream);
+                            resource = createAudioResource(probeStream, { inputType: type });
+                            console.log('[VOICE] Using demuxed stream type:', type);
+                        } catch (probeError) {
+                            console.warn('[VOICE] demuxProbe failed, falling back to default stream:', probeError.message);
+                            try {
+                                const stream = await play.stream(videoInfo.url);
+                                resource = createAudioResource(stream.stream, { inputType: stream.type });
+                                console.log('[VOICE] Using fallback stream type:', stream.type);
+                            } catch (streamError) {
+                                console.error('[VOICE] All stream methods failed:', streamError.message);
+                                throw new Error('Failed to create audio stream from video');
+                            }
+                        }
                         const player = createAudioPlayer();
                         
                         let connection = getVoiceConnection(selectInteraction.guild.id);
@@ -107,6 +158,61 @@ module.exports = {
                                 guildId: selectInteraction.guild.id,
                                 adapterCreator: selectInteraction.guild.voiceAdapterCreator,
                             });
+
+                            // Monitor connection state
+                            connection.on(VoiceConnectionStatus.Signalling, () => {
+                                console.log('[VOICE] Requesting permission to join voice channel...');
+                            });
+
+                            connection.on(VoiceConnectionStatus.Connecting, () => {
+                                console.log('[VOICE] Establishing connection...');
+                            });
+
+                            connection.on(VoiceConnectionStatus.Ready, () => {
+                                console.log('[VOICE] Connection ready - playing audio!');
+                            });
+
+                            connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+                                console.log('[VOICE] Disconnected from voice channel');
+                                try {
+                                    await Promise.race([
+                                        entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                                        entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                                    ]);
+                                } catch {
+                                    connection.destroy();
+                                    selectInteraction.client.user.setActivity(null);
+                                }
+                            });
+
+                            connection.on('error', (error) => {
+                                console.error('[VOICE] Connection error:', error);
+                                selectInteraction.followUp({ 
+                                    content: '❌ Voice connection error occurred. Please try again.', 
+                                    ephemeral: true 
+                                });
+                            });
+                        }
+
+                        // Wait for connection to be ready before playing
+                        try {
+                            await selectInteraction.editReply({
+                                content: `🔊 Establishing voice connection... 🎵 **${selectedVideo.title}**`
+                            });
+                            
+                            await entersState(connection, VoiceConnectionStatus.Ready, 15000);
+                            
+                            await selectInteraction.editReply({
+                                content: `▶️ Now playing: **${selectedVideo.title}**`
+                            });
+                        } catch (error) {
+                            console.error('[VOICE] Connection timeout:', error);
+                            await selectInteraction.followUp({ 
+                                content: '❌ Failed to connect to voice channel. Please check my permissions and try again.', 
+                                ephemeral: true 
+                            });
+                            connection.destroy();
+                            return;
                         }
 
                         player.play(resource);
@@ -143,15 +249,53 @@ module.exports = {
 
                         player.on('error', error => {
                             console.error('Audio player error:', error);
-                            selectInteraction.followUp({ content: 'An error occurred while playing.', ephemeral: true });
+                            let errorMessage = 'An error occurred while playing audio.';
+                            
+                            if (error.message.includes('FFmpeg')) {
+                                errorMessage = '❌ FFmpeg error: Audio format not supported. Please try another song.';
+                            } else if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
+                                errorMessage = '❌ Network timeout: Could not stream audio. Please try again.';
+                            } else if (error.message.includes('403') || error.message.includes('forbidden')) {
+                                errorMessage = '❌ Video restricted: This video cannot be played due to restrictions.';
+                            } else if (error.message.includes('429')) {
+                                errorMessage = '❌ Rate limited: Too many requests. Please wait a moment and try again.';
+                            }
+                            
+                            selectInteraction.followUp({ content: errorMessage, ephemeral: true });
                             connection.destroy();
-                            // Clear the bot's activity status when there's an error
                             selectInteraction.client.user.setActivity(null);
                         });
 
                     } catch (error) {
                         console.error('Playback error:', error);
-                        await selectInteraction.followUp({ content: 'An error occurred while playing the selected song.', ephemeral: true });
+                        
+                        let errorMessage = 'An error occurred while playing music.';
+                        
+                        // Provide specific error messages based on common issues
+                        if (error.message.includes('FFmpeg')) {
+                            errorMessage = '❌ FFmpeg error: Audio processing failed. This might be due to an unsupported video format.';
+                        } else if (error.message.includes('403') || error.message.includes('forbidden')) {
+                            errorMessage = '❌ YouTube access denied. The video might be private or region-restricted.';
+                        } else if (error.message.includes('429')) {
+                            errorMessage = '❌ YouTube rate limit reached. Please wait a moment and try again.';
+                        } else if (error.message.includes('Captcha') || error.message.includes('bot')) {
+                            errorMessage = '❌ YouTube detected bot activity. Please try again in a few minutes.';
+                        } else if (error.message.includes('timeout')) {
+                            errorMessage = '❌ Connection timeout. Please check your internet connection and try again.';
+                        } else if (error.message.includes('permissions')) {
+                            errorMessage = '❌ Permission denied. Please ensure I have the necessary voice channel permissions.';
+                        } else if (error.message.includes('stream')) {
+                            errorMessage = '❌ Stream error: Unable to process audio from this video. Please try another song.';
+                        }
+                        
+                        await selectInteraction.followUp({ 
+                            content: errorMessage, 
+                            ephemeral: true 
+                        });
+                        
+                        if (connection) {
+                            connection.destroy();
+                        }
                         // Clear the bot's activity status when there's an error
                         selectInteraction.client.user.setActivity(null);
                     }

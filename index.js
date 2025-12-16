@@ -1,4 +1,21 @@
 require('dotenv').config();
+
+// Validate dependencies on startup
+function validateDependencies() {
+    try {
+        require('discord.js');
+        require('@discordjs/voice');
+        require('play-dl');
+        require('ffmpeg-static');
+        console.log('[INIT] ✅ All required dependencies are available');
+    } catch (error) {
+        console.error('[INIT] ❌ Missing required dependencies:', error.message);
+        process.exit(1);
+    }
+}
+
+validateDependencies();
+
 const { Client, Collection, GatewayIntentBits, Events } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
@@ -81,6 +98,23 @@ client.once(Events.ClientReady, async () => {
         console.log('[INFO] 🧠 Gemini AI Key loaded successfully.');
     } else {
         console.log('[WARN] ⚠️ Gemini AI Key is MISSING in process.env!');
+    }
+
+    // Validate voice dependencies
+    try {
+        const { generateDependencyReport } = require('@discordjs/voice');
+        const ffmpeg = require('ffmpeg-static');
+        const play = require('play-dl');
+        
+        play.setFfmpegPath(ffmpeg);
+        console.log('[INFO] 🎵 Voice dependencies validated successfully.');
+        console.log('[INFO] 📦 FFmpeg path:', ffmpeg);
+        
+        // Optional: Log dependency report for debugging
+        // console.log(generateDependencyReport());
+    } catch (error) {
+        console.error('[ERROR] ❌ Voice dependency validation failed:', error.message);
+        console.error('[ERROR] Voice commands may not work properly!');
     }
 
     // Set bot avatar if BOT_AVATAR_URL is provided
