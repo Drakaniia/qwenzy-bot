@@ -9,4 +9,12 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Install bash to support more complex scripts
+RUN apk add --no-cache bash
+
+# Create a startup script to handle environment detection
+RUN printf '#!/bin/bash\nif [ -z "$DISCORD_TOKEN" ] || [ -z "$CLIENT_ID" ]; then\n  echo "[WARNING] DISCORD_TOKEN or CLIENT_ID not set. Starting health check server only."\n  node -e "\n    const express = require(\"express\");\n    const app = express();\n    const PORT = process.env.PORT || 3000;\n    app.get(\"/\", (req, res) => res.send(\"Qwenzy Bot - Environment variables not set. Health check server running.\"));\n    app.get(\"/health\", (req, res) => res.status(200).json({ status: \"ok\", uptime: process.uptime(), message: \"Environment variables missing\" }));\n    app.listen(PORT, () => console.log(\`Health check server running on port \${PORT}\`));\n  "\nelse\n  echo "[INFO] Starting Qwenzy Bot with environment variables..." \n  npm start\nfi' > /app/start.sh
+
+RUN chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]
