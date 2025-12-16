@@ -4,7 +4,7 @@ const rateLimiter = require('../../utils/rateLimiter');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('search')
+        .setName('play')
         .setDescription('Search for music on YouTube and select to play directly')
         .addStringOption(option =>
             option.setName('query')
