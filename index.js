@@ -3,6 +3,32 @@ const { Client, Collection, GatewayIntentBits, Events } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
+// Wispbyte and similar platforms typically don't require an HTTP server
+// but it's good practice to have one for health checks
+const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Health check endpoint for Wispbyte or similar hosting platforms
+app.get('/', (req, res) => {
+    res.send('Qwenzy Bot is running!');
+});
+
+// Additional health check endpoint for monitoring
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
+// Ping endpoint to keep the bot alive
+app.get('/ping', (req, res) => {
+    res.status(200).send('pong');
+});
+
+// Keep the server running for platforms that need it
+const server = app.listen(PORT, () => {
+    console.log(`Health check server running on port ${PORT}`);
+});
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
