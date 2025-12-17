@@ -79,15 +79,16 @@ module.exports = {
 
                 try {
                     searchResults = await rateLimiter.execute(async () => {
-                        const results = await ytsr.search(query, { limit: 5 });
+                        const results = await ytsr(query, { limit: 5 });
                         // Format the results to match the expected structure
-                        return results.map(result => ({
+                        return results.items.filter(item => item.type === 'video').slice(0, 5).map(result => ({
                             title: result.title,
                             url: result.url,
                             duration: result.duration,
                             durationRaw: result.duration,
-                            channel: { name: result.channel?.name || 'Unknown Channel' },
-                            thumbnail: { url: result.thumbnail?.url || null }
+                            durationFormatted: result.duration || 'N/A',
+                            channel: { name: result.author?.name || 'Unknown Channel' },
+                            thumbnail: result.bestThumbnail || result.thumbnails?.[0] || null
                         }));
                     });
                     break;
