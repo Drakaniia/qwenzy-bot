@@ -250,8 +250,9 @@ module.exports = {
                 timestamp: new Date().toISOString(),
             };
 
+            let replyMessage;
             try {
-                await interaction.editReply({
+                replyMessage = await interaction.editReply({
                     content: '',
                     embeds: [embed],
                     components: [row]
@@ -265,29 +266,26 @@ module.exports = {
                 }
             }
 
-            const collector = interaction.channel.createMessageComponentCollector({
-                componentType: ComponentType.StringSelect,
-                time: 30000 // Reduced timeout to 30 seconds
-            });
-
-            collector.on('end', (collected, reason) => {
-                if (reason === 'time') {
-                    console.log('[DEBUG] Collector timed out');
-                    if (isInteractionExpired(interaction)) {
-                        console.log('[INFO] Interaction expired, skipping timeout message');
-                        return;
-                    }
-                    try {
-                        interaction.editReply({
-                            components: [],
-                            content: 'Search selection timed out. Please run /play again.'
-                        }).catch(() => {
-                            console.log('[INFO] Interaction expired, could not edit reply');
-                        });
-                    } catch (error) {
-                        console.log('[INFO] Interaction expired during timeout handling');
-                    }
+            // Collect selections from the message when possible (more reliable than collecting from the channel).
+            // Some environments can have partial/missing channel objects, which prevents the collector from firing.
+            const collectorSource = replyMessage ?? interaction.channel;
+            if (!collectorSource || typeof collectorSource.createMessageComponentCollector !== 'function') {
+                console.error('[ERROR] Cannot create component collector (missing reply message/channel)');
+                try {
+                    await interaction.editReply({
+                        content: '❌ Could not attach interaction collector. Please try /play again.',
+                        components: []
+                    });
+                } catch (_) {
+                    // ignore
                 }
+                return;
+            }
+
+            const collector = collectorSource.createMessageComponentCollector({
+                componentType: ComponentType.StringSelect,
+                time: 30000, // 30 seconds
+                filter: (i) => i.customId === 'music-select'
             });
 
             collector.on('collect', async (selectInteraction) => {
@@ -305,7 +303,7 @@ module.exports = {
 
                 if (selectedVideo) {
                     // Comprehensive permission and voice channel checks
-                    const voiceChannel = selectInteraction.member.voice.channel;
+                    const voiceChannel = selectInteraction.member?.voice?.channel ?? interaction.member?.voice?.channel;
                     console.log('[DEBUG] Selected video, checking voice channel:', voiceChannel?.id || 'null');
 
                     if (!voiceChannel) {
@@ -407,6 +405,8 @@ module.exports = {
                                     channelId: voiceChannel.id,
                                     guildId: selectInteraction.guild.id,
                                     adapterCreator: selectInteraction.guild.voiceAdapterCreator,
+                                    selfDeaf: false,
+                                    selfMute: false,
                                 });
 
                                 // Monitor connection state
@@ -463,9 +463,9 @@ module.exports = {
                         // Wait for connection to be ready before playing
                         try {
                             await Promise.race([
-                                entersState(connection, VoiceConnectionStatus.Ready, 15000),
-                                new Promise((_, reject) => 
-                                    setTimeout(() => reject(new Error('Voice connection timeout')), 20000)
+                                entersState(connection, VoiceConnectionStatus.Ready, 30000),
+                                new Promise((_, reject) =>
+                                    setTimeout(() => reject(new Error('Voice connection timeout')), 35000)
                                 )
                             ]);
 
