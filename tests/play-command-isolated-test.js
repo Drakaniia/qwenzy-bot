@@ -74,21 +74,21 @@ describe('Discord Music Play Command Isolated Tests', () => {
         it('should truncate long video titles correctly', () => {
             const longTitle = 'A'.repeat(100);
             const maxLength = 80;
-            
-            const formattedTitle = longTitle.length > maxLength ? 
-                longTitle.substring(0, maxLength - 3) + '...' : 
+
+            const formattedTitle = longTitle.length > maxLength ?
+                longTitle.substring(0, maxLength - 3) + '...' :
                 longTitle;
 
             expect(formattedTitle).to.have.length(maxLength);
-            expect(formattedTitle).to.endWith('...');
+            expect(formattedTitle).to.match(/\.\.\.$/);
         });
 
         it('should keep short titles unchanged', () => {
             const shortTitle = 'Short Title';
             const maxLength = 80;
-            
-            const formattedTitle = shortTitle.length > maxLength ? 
-                shortTitle.substring(0, maxLength - 3) + '...' : 
+
+            const formattedTitle = shortTitle.length > maxLength ?
+                shortTitle.substring(0, maxLength - 3) + '...' :
                 shortTitle;
 
             expect(formattedTitle).to.equal(shortTitle);
@@ -136,7 +136,7 @@ describe('Discord Music Play Command Isolated Tests', () => {
         it('should handle Discord API error codes', () => {
             const alreadyAcknowledgedError = { code: 40060 };
             const interactionExpiredError = { code: 10062 };
-            
+
             expect(alreadyAcknowledgedError.code).to.equal(40060);
             expect(interactionExpiredError.code).to.equal(10062);
         });
@@ -147,7 +147,7 @@ describe('Discord Music Play Command Isolated Tests', () => {
             function getOrdinalNumber(num) {
                 const j = num % 10;
                 const k = num % 100;
-                
+
                 if (j === 1 && k !== 11) {
                     return `${num}st`;
                 }

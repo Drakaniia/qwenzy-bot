@@ -2,49 +2,49 @@ const { expect } = require('chai');
 const sinon = require('sinon');
 
 describe('Play Command Logic Tests (No External Dependencies)', () => {
-    
+
     describe('Error Message Categorization Logic', () => {
         it('should categorize 429 errors as RATE_LIMIT', () => {
             const error = { message: '429 Too Many Requests' };
             let errorType = 'UNKNOWN';
-            
+
             if (error.message.includes('429')) {
                 errorType = 'RATE_LIMIT';
             }
-            
+
             expect(errorType).to.equal('RATE_LIMIT');
         });
 
         it('should categorize ENOTFOUND errors as NETWORK', () => {
             const error = { message: 'ENOTFOUND www.youtube.com' };
             let errorType = 'UNKNOWN';
-            
+
             if (error.message.includes('ENOTFOUND')) {
                 errorType = 'NETWORK';
             }
-            
+
             expect(errorType).to.equal('NETWORK');
         });
 
         it('should categorize timeout errors as TIMEOUT', () => {
             const error = { message: 'Search timeout' };
             let errorType = 'UNKNOWN';
-            
+
             if (error.message.includes('timeout')) {
                 errorType = 'TIMEOUT';
             }
-            
+
             expect(errorType).to.equal('TIMEOUT');
         });
 
         it('should categorize play-dl errors as LIBRARY_ERROR', () => {
             const error = { message: 'play-dl search function is not available' };
             let errorType = 'UNKNOWN';
-            
+
             if (error.message.includes('play-dl')) {
                 errorType = 'LIBRARY_ERROR';
             }
-            
+
             expect(errorType).to.equal('LIBRARY_ERROR');
         });
     });
@@ -53,32 +53,32 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
         it('should truncate titles longer than 80 characters', () => {
             const longTitle = 'A'.repeat(100);
             const expectedLength = 80;
-            
-            const result = longTitle.length > 80 ? 
-                longTitle.substring(0, 77) + '...' : 
+
+            const result = longTitle.length > 80 ?
+                longTitle.substring(0, 77) + '...' :
                 longTitle;
-            
+
             expect(result).to.have.length(expectedLength);
-            expect(result).to.endWith('...');
+            expect(result).to.match(/\.\.\.$/);
         });
 
         it('should keep short titles unchanged', () => {
             const shortTitle = 'Short Title';
-            
-            const result = shortTitle.length > 80 ? 
-                shortTitle.substring(0, 77) + '...' : 
+
+            const result = shortTitle.length > 80 ?
+                shortTitle.substring(0, 77) + '...' :
                 shortTitle;
-            
+
             expect(result).to.equal(shortTitle);
         });
 
         it('should handle exactly 80 character titles', () => {
             const exactTitle = 'A'.repeat(80);
-            
-            const result = exactTitle.length > 80 ? 
-                exactTitle.substring(0, 77) + '...' : 
+
+            const result = exactTitle.length > 80 ?
+                exactTitle.substring(0, 77) + '...' :
                 exactTitle;
-            
+
             expect(result).to.equal(exactTitle);
             expect(result).to.have.length(80);
         });
@@ -123,7 +123,7 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
             const oldTimestamp = now - (15 * 60 * 1000); // 15 minutes ago
             const interactionAge = now - oldTimestamp;
             const isExpired = interactionAge > (14 * 60 * 1000); // 14 minutes buffer
-            
+
             expect(isExpired).to.be.true;
         });
 
@@ -132,7 +132,7 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
             const freshTimestamp = now - (5 * 60 * 1000); // 5 minutes ago
             const interactionAge = now - freshTimestamp;
             const isExpired = interactionAge > (14 * 60 * 1000); // 14 minutes buffer
-            
+
             expect(isExpired).to.be.false;
         });
 
@@ -141,7 +141,7 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
             const edgeTimestamp = now - (14 * 60 * 1000); // Exactly 14 minutes ago
             const interactionAge = now - edgeTimestamp;
             const isExpired = interactionAge > (14 * 60 * 1000); // Strictly greater than
-            
+
             expect(isExpired).to.be.false;
         });
     });
@@ -150,21 +150,21 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
         it('should recognize already acknowledged error', () => {
             const error = { code: 40060 };
             const isAlreadyAcknowledged = error.code === 40060;
-            
+
             expect(isAlreadyAcknowledged).to.be.true;
         });
 
         it('should recognize interaction expired error', () => {
             const error = { code: 10062 };
             const isInteractionExpired = error.code === 10062;
-            
+
             expect(isInteractionExpired).to.be.true;
         });
 
         it('should handle unknown error codes', () => {
             const error = { code: 99999 };
             const isKnownError = error.code === 40060 || error.code === 10062;
-            
+
             expect(isKnownError).to.be.false;
         });
     });
@@ -174,10 +174,10 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
             const baseDelay = 1000;
             const attempt = 2;
             const maxDelay = 30000;
-            
+
             const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
             const expectedDelay = Math.min(1000 * 4, 30000); // 2^2 = 4
-            
+
             expect(delay).to.equal(expectedDelay);
             expect(delay).to.equal(4000);
         });
@@ -186,9 +186,9 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
             const baseDelay = 1000;
             const attempt = 10; // High attempt number
             const maxDelay = 30000;
-            
+
             const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
-            
+
             expect(delay).to.equal(maxDelay);
         });
     });
@@ -221,7 +221,7 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
         it('should handle missing voice channel', () => {
             const voiceChannel = null;
             const hasVoiceChannel = voiceChannel !== null;
-            
+
             expect(hasVoiceChannel).to.be.false;
         });
 
@@ -233,7 +233,7 @@ describe('Play Command Logic Tests (No External Dependencies)', () => {
                 })
             };
 
-            const isFullAndNoMovePermission = voiceChannel.full && 
+            const isFullAndNoMovePermission = voiceChannel.full &&
                 !voiceChannel.permissionsFor().has('MoveMembers');
 
             expect(isFullAndNoMovePermission).to.be.true;

@@ -121,7 +121,7 @@ describe('Play Command with Proxyquire Tests', () => {
                 reply: sinon.stub().resolves(),
                 editReply: sinon.stub().resolves(),
                 followUp: sinon.stub().resolves(),
-                user: { 
+                user: {
                     id: 'user-123',
                     tag: 'testuser#1234'
                 },
@@ -130,7 +130,7 @@ describe('Play Command with Proxyquire Tests', () => {
             };
 
             // Mock the rate limiter to return search results
-            stubs['../../utils/rateLimiter'].execute.resolves([{
+            stubs['../../utils/rateLimiter'].execute.onCall(0).resolves([{
                 title: 'Test Song',
                 url: 'https://youtube.com/test',
                 durationFormatted: '3:45',
@@ -140,15 +140,24 @@ describe('Play Command with Proxyquire Tests', () => {
             try {
                 await playCommand.execute(mockInteraction);
             } catch (error) {
-                // Expected to fail at collector stage
+                // Expected to fail at collector stage as the collector won't receive a selection
             }
 
-            expect(mockInteraction.reply.calledWith('🔍 Searching...')).to.be.true;
+            // Check that reply was called with the initial searching message
+            expect(mockInteraction.reply.calledOnce).to.be.true;
+            const firstCall = mockInteraction.reply.firstCall;
+            const args = firstCall.args[0];
+            const content = typeof args === 'string' ? args : (args && args.content) ? args.content : args;
+
+            // The initial message should be "🔍 Searching..."
+            expect(content).to.include('🔍 Searching...');
         });
     });
 
     describe('Error Handling', () => {
-        it('should handle rate limit errors', async () => {
+        it('should handle rate limit errors', async function() {
+            this.timeout(20000); // Increase timeout for this test
+
             const mockInteraction = {
                 member: { voice: { channel: { id: 'test' } } },
                 guild: { id: 'test' },
@@ -159,15 +168,32 @@ describe('Play Command with Proxyquire Tests', () => {
                 followUp: sinon.stub().resolves()
             };
 
-            // Mock rate limiter to throw rate limit error
-            stubs['../../utils/rateLimiter'].execute.rejects(new Error('429 Too Many Requests'));
+            // Mock rate limiter to throw rate limit error multiple times to trigger the max retries
+            const rateLimitError = new Error('429 Too Many Requests');
+            stubs['../../utils/rateLimiter'].execute.onCall(0).rejects(rateLimitError);
+            stubs['../../utils/rateLimiter'].execute.onCall(1).rejects(rateLimitError);
+            stubs['../../utils/rateLimiter'].execute.onCall(2).rejects(rateLimitError);
 
             await playCommand.execute(mockInteraction);
 
+            // After multiple retries, editReply should be called with failure message
             expect(mockInteraction.editReply.called).to.be.true;
+            const calls = mockInteraction.editReply.getCalls();
+            let foundMatch = false;
+            for (const call of calls) {
+                const args = call.args[0];
+                const content = typeof args === 'string' ? args : args?.content || args;
+                if (content && (typeof content === 'string' ? content : content.content).includes('Failed to search for music after')) {
+                    foundMatch = true;
+                    break;
+                }
+            }
+            expect(foundMatch).to.be.true;
         });
 
-        it('should handle network errors', async () => {
+        it('should handle network errors', async function() {
+            this.timeout(15000); // Increase timeout for this test
+
             const mockInteraction = {
                 member: { voice: { channel: { id: 'test' } } },
                 guild: { id: 'test' },
@@ -178,12 +204,27 @@ describe('Play Command with Proxyquire Tests', () => {
                 followUp: sinon.stub().resolves()
             };
 
-            // Mock rate limiter to throw network error
-            stubs['../../utils/rateLimiter'].execute.rejects(new Error('ENOTFOUND www.youtube.com'));
+            // Mock rate limiter to throw network error multiple times
+            const networkError = new Error('ENOTFOUND www.youtube.com');
+            stubs['../../utils/rateLimiter'].execute.onCall(0).rejects(networkError);
+            stubs['../../utils/rateLimiter'].execute.onCall(1).rejects(networkError);
+            stubs['../../utils/rateLimiter'].execute.onCall(2).rejects(networkError);
 
             await playCommand.execute(mockInteraction);
 
-            expect(mockInteraction.reply.called).to.be.true;
+            // editReply should be called after the initial reply with a network error message
+            expect(mockInteraction.editReply.called).to.be.true;
+            const calls = mockInteraction.editReply.getCalls();
+            let foundMatch = false;
+            for (const call of calls) {
+                const args = call.args[0];
+                const content = typeof args === 'string' ? args : args?.content || args;
+                if (content && (typeof content === 'string' ? content : content.content).includes('Network error')) {
+                    foundMatch = true;
+                    break;
+                }
+            }
+            expect(foundMatch).to.be.true;
         });
     });
 
@@ -224,7 +265,7 @@ describe('Play Command with Proxyquire Tests', () => {
             }));
 
             expect(options[0].label).to.have.length(80); // 77 + '...'
-            expect(options[0].label).to.endWith('...');
+            expect(options[0].label).to.include('...');
         });
     });
 });

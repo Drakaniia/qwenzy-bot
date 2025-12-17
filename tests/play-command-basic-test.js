@@ -103,7 +103,7 @@ describe('Discord Music Play Command Basic Tests', () => {
                 longTitle;
 
             expect(formattedTitle).to.have.length(expectedLength);
-            expect(formattedTitle).to.endWith('...');
+            expect(formattedTitle).to.match(/\.\.\.$/);
         });
 
         it('should handle short titles correctly', () => {
