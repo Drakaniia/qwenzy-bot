@@ -28,3 +28,40 @@ tmp
 temp
 .git
 .vscode
+# OS generated files
+*.swp
+*.swo
+*~
+._*
+
+# IDE specific
+.idea/
+*.iml
+.vs/
+*.code-workspace
+
+# Additional log files
+.log
+*.log.*
+
+# Cache directories
+.cache/
+ coverage/
+.nyc_output/
+coverage/
+
+# Process files
+*.pid
+*.seed
+*.pid.lock
+
+# Environment files (more specific)
+.env*.local
+.env*.dev
+.env*.development
+.env*.test
+.env*.staging
+.env*.prod
+.env*.production
+.env*.backup
+.env*.bak
