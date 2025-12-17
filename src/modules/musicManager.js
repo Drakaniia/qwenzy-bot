@@ -1,4 +1,4 @@
-const { createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus } = require('@discordjs/voice');
+const { createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus, demuxProbe } = require('@discordjs/voice');
 const ytdl = require('@distube/ytdl-core');
 const rateLimiter = require('../utils/rateLimiter');
 
@@ -140,8 +140,9 @@ class MusicManager {
                         highWaterMark: 1 << 25
                     });
 
-                    resource = createAudioResource(stream, {
-                        inputType: 'opus',
+                    const { stream: newStream, type } = await demuxProbe(stream);
+                    resource = createAudioResource(newStream, {
+                        inputType: type,
                         inlineVolume: true
                     });
                     break;
@@ -251,8 +252,9 @@ class MusicManager {
                         highWaterMark: 1 << 25
                     });
 
-                    resource = createAudioResource(stream, {
-                        inputType: 'opus',
+                    const { stream: newStream, type } = await demuxProbe(stream);
+                    resource = createAudioResource(newStream, {
+                        inputType: type,
                         inlineVolume: true
                     });
                     break;
