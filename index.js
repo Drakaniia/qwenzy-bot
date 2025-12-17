@@ -22,6 +22,7 @@ function validateDependencies() {
         console.log('[INIT] ✅ All required dependencies are available');
     } catch (error) {
         console.error('[INIT] ❌ Missing required dependencies:', error.message);
+        console.error('[DEBUG] Error details:', error);
         process.exit(1);
     }
 }
