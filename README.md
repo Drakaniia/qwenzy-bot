@@ -11,7 +11,7 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
 
 ## General Commands
 - **`/ping`** - Check bot latency
-- **`/ask <question>`** - Ask questions to the AI (powered by Google Gemini)
+- **`/ask <question>`** - Ask questions to the AI (supports both Google Gemini and Groq API)
 
 ## Fun Commands
 - **`/joke`** - Get a programming joke
@@ -25,7 +25,7 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
 ### Prerequisites
 - Node.js 18 or higher
 - Discord Bot Token
-- Google Gemini API Key (optional, for AI features)
+- Google Gemini API Key or Groq API Key (optional, for AI features)
 
 ### Local Setup
 1. **Clone the repository**
@@ -81,7 +81,8 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
 
 ### Optional but Recommended
 - `GUILD_ID` - Your Discord server ID for faster command deployment
-- `GEMINI_API_KEY` - Google Generative AI API key for AI chat features
+- `GEMINI_API_KEY` - Google Generative AI API key for AI chat features (optional)
+- `GROQ_API_KEY` - Groq API key for AI chat features (alternative to Gemini, optional)
 - `BOT_AVATAR_URL` - URL for bot avatar image
 
 ## Deployment Options
@@ -113,6 +114,7 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
    - `LAVALINK_SECURE=false`
    - `LAVALINK_SEARCH_PREFIX=ytsearch`
    - `GEMINI_API_KEY=your_google_gemini_api_key` (optional)
+   - `GROQ_API_KEY=your_groq_api_key` (alternative to Gemini, optional)
 
 **Important**: Both services must be in the same Render project to communicate via internal URLs.
 
@@ -194,7 +196,7 @@ The bot requires these Discord intents:
   - Verify bot has voice permissions in the channel
   - Ensure you're in a voice channel when using music commands
   - Check Lavalink service status and logs
-- **AI responses not working**: Verify your `GEMINI_API_KEY` is valid
+- **AI responses not working**: Verify your `GEMINI_API_KEY` or `GROQ_API_KEY` is valid
 - **Bot disconnecting**: Check internet connection and Discord API status
 - **"Unknown interaction" errors**: These are typically caused by timeouts and are now properly handled
 
