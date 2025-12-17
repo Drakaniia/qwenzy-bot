@@ -102,6 +102,13 @@ const lavalinkNodes = [
     }
 ];
 
+console.log('[LAVALINK] Configuration:', {
+    host: lavalinkNodes[0].host,
+    port: lavalinkNodes[0].port,
+    secure: lavalinkNodes[0].secure,
+    searchPrefix: process.env.LAVALINK_SEARCH_PREFIX || 'ytsearch'
+});
+
 client.riffy = new Riffy(
     client,
     lavalinkNodes,

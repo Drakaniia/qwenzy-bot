@@ -1,7 +1,7 @@
 services:
 - type: worker
   name: qwenzy-bot
-  env: node
+  runtime: node
   region: frankfurt
   buildCommand: npm install
   startCommand: npm start
@@ -16,3 +16,15 @@ services:
     sync: false
   - key: GEMINI_API_KEY
     sync: false
+  # Lavalink configuration for production
+  # You can use a free Lavalink service or self-host one
+  - key: LAVALINK_HOST
+    value: lavalink.darrennathanael.com
+  - key: LAVALINK_PORT
+    value: 2333
+  - key: LAVALINK_PASSWORD
+    value: "Raththapala@2004"
+  - key: LAVALINK_SECURE
+    value: "false"
+  - key: LAVALINK_SEARCH_PREFIX
+    value: ytsearch

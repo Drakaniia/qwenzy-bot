@@ -1,6 +1,8 @@
 server:
   port: 2333
   address: 0.0.0.0
+  http:
+    port: 8080
 
 plugins:
   - dependency: "dev.lavalink.youtube:youtube-plugin:1.7.2"

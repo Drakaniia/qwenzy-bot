@@ -50,7 +50,13 @@ class MusicManager {
     }
 
     async search(query, requester) {
-        return this.riffy.resolve({ query, requester });
+        try {
+            const result = await this.riffy.resolve({ query, requester });
+            return result;
+        } catch (error) {
+            console.error('[LAVALINK] Search error:', error.message);
+            throw error;
+        }
     }
 
     getCurrentTrack(guildId) {
