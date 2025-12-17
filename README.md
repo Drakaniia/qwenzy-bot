@@ -1,26 +1,26 @@
-# Qweny Bot 🤖
+# Qweny Bot
 
 Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It features a "Programming Humor" personality and offers music, economy, AI capabilities, and more!
 
-## 🎵 Music Commands
+## Music Commands
 - **`/play <query>`** - Search for music on YouTube and select to play directly
 - **`/pause`** - Pause the current playing music
 - **`/resume`** - Resume the paused music
 - **`/skip`** - Skip the current song and disconnect
 - **`/stop`** - Stop the music and leave the voice channel
 
-## 🤖 General Commands
+## General Commands
 - **`/ping`** - Check bot latency
 - **`/ask <question>`** - Ask questions to the AI (powered by Google Gemini)
 
-## 😄 Fun Commands
+## Fun Commands
 - **`/joke`** - Get a programming joke
 
-## 💰 Economy Commands
+## Economy Commands
 - **`/balance`** - Check your current balance
 - **`/work`** - Earn money by working
 
-## 🚀 Setup Instructions
+## Setup Instructions
 
 ### Prerequisites
 - Node.js 18 or higher
@@ -73,7 +73,7 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
    npm start
    ```
 
-## 📋 Environment Variables
+## Environment Variables
 
 ### Required
 - `DISCORD_TOKEN` - Your Discord bot token from the Discord Developer Portal
@@ -84,14 +84,37 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
 - `GEMINI_API_KEY` - Google Generative AI API key for AI chat features
 - `BOT_AVATAR_URL` - URL for bot avatar image
 
-## ☁️ Deployment Options
+## Deployment Options
 
-### Render
-1. Create a new Web Service on Render
+### Render (Recommended Setup)
+
+#### Step 1: Deploy Lavalink Service
+1. Create a new **Web Service** on Render
+2. Select "Docker" as the environment
+3. Connect your GitHub repository
+4. **Dockerfile Path**: `lavalink.Dockerfile`
+5. **Service Name**: `qwenzy-lavalink` (or your preferred name)
+6. Set environment variables:
+   - `PORT=2333`
+7. Note the internal service URL (e.g., `qwenzy-lavalink:2333`)
+
+#### Step 2: Deploy Bot Service
+1. Create another new **Web Service** on Render
 2. Connect your GitHub repository
 3. **Build Command**: `npm install`
 4. **Start Command**: `npm start`
-5. Add all required environment variables
+5. Add environment variables:
+   - `DISCORD_TOKEN=your_discord_bot_token`
+   - `CLIENT_ID=your_discord_application_client_id`
+   - `GUILD_ID=your_discord_server_id`
+   - `LAVALINK_HOST=qwenzy-lavalink` (use your Lavalink service name)
+   - `LAVALINK_PORT=2333`
+   - `LAVALINK_PASSWORD=youshallnotpass`
+   - `LAVALINK_SECURE=false`
+   - `LAVALINK_SEARCH_PREFIX=ytsearch`
+   - `GEMINI_API_KEY=your_google_gemini_api_key` (optional)
+
+**Important**: Both services must be in the same Render project to communicate via internal URLs.
 
 ### Railway
 1. Create a new project on Railway
@@ -110,7 +133,7 @@ Or using docker-compose:
 docker-compose up -d
 ```
 
-## 🎵 Music Features
+## Music Features
 
 The music system includes:
 - **Lavalink (recommended)**: Stable playback via a local/remote Lavalink node (configured via env vars)
@@ -126,7 +149,7 @@ The music system includes:
 4. The music will play in your voice channel
 5. Use `/pause`, `/resume`, `/skip`, or `/stop` to control playback
 
-## 🛠️ Bot Configuration
+## Bot Configuration
 
 ### Discord Bot Permissions
 Make sure your bot has these permissions:
@@ -146,23 +169,31 @@ The bot requires these Discord intents:
 - `MessageContent`
 - `GuildVoiceStates`
 
-## 📚 Documentation
+## Documentation
 - [Detailed Setup Guide](docs/setup_guide.md) - Step-by-step creation story
 - [Discord.js Documentation](https://discord.js.org/) - Framework documentation
-- [play-dl Documentation](https://npmjs.com/package/play-dl) - Music playback library
+- [Lavalink Documentation](https://lavalink.dev/) - Music server documentation
 
-## 🤝 Contributing
+## Contributing
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Test thoroughly
 5. Submit a pull request
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 - **Commands not registering**: Ensure you've run `node deploy-commands.js`
-- **Music not playing**: Check that FFmpeg is installed, bot has voice permissions, and you're in a voice channel
+- **"No nodes are available" error**: 
+  - Check that your Lavalink service is running
+  - Verify `LAVALINK_HOST` points to the correct service (use service name for Render, `localhost` for local)
+  - Ensure both bot and Lavalink services are in the same Render project
+  - Check Lavalink logs for connection errors
+- **Music not playing**: 
+  - Verify bot has voice permissions in the channel
+  - Ensure you're in a voice channel when using music commands
+  - Check Lavalink service status and logs
 - **AI responses not working**: Verify your `GEMINI_API_KEY` is valid
 - **Bot disconnecting**: Check internet connection and Discord API status
 - **"Unknown interaction" errors**: These are typically caused by timeouts and are now properly handled
@@ -170,8 +201,8 @@ The bot requires these Discord intents:
 ### Debug Mode
 Enable debug logging by setting `DEBUG=true` in your environment variables.
 
-## 📄 License
+## License
 This project is licensed under the ISC License.
 
-## 🌟 Support
+## Support
 For support, create an issue in the GitHub repository or join our Discord server.
