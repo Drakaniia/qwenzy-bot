@@ -45,16 +45,30 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
    DISCORD_TOKEN=your_discord_bot_token
    CLIENT_ID=your_discord_application_client_id
    GUILD_ID=your_discord_server_id
+
+   # Lavalink (recommended for stable music playback)
+   LAVALINK_HOST=localhost
+   LAVALINK_PORT=2333
+   LAVALINK_PASSWORD=youshallnotpass
+   LAVALINK_SECURE=false
+   LAVALINK_SEARCH_PREFIX=ytsearch
+
    GEMINI_API_KEY=your_google_gemini_api_key
    BOT_AVATAR_URL=optional_avatar_url
    ```
 
-4. **Deploy slash commands**
+4. **(Recommended) Start Lavalink locally**
+   This repo includes a ready-to-run Lavalink v4 node via docker-compose:
+   ```bash
+   docker compose up -d lavalink
+   ```
+
+5. **Deploy slash commands**
    ```bash
    node deploy-commands.js
    ```
 
-5. **Start the bot**
+6. **Start the bot**
    ```bash
    npm start
    ```
@@ -99,12 +113,10 @@ docker-compose up -d
 ## 🎵 Music Features
 
 The music system includes:
-- **YouTube Integration**: Search and play from YouTube with a user-friendly dropdown selection
+- **Lavalink (recommended)**: Stable playback via a local/remote Lavalink node (configured via env vars)
+- **Search + Select UI**: Search for tracks and pick from a dropdown
 - **Voice Channel Management**: Automatic permission checking and connection management
-- **Playback Controls**: Pause, resume, skip, and stop functionality
-- **FFmpeg Integration**: Proper audio processing using ffmpeg-static
-- **Rate Limiting**: Prevents YouTube API rate limiting with built-in rate limiter
-- **Connection Monitoring**: Proper state tracking and error handling
+- **Playback Controls**: Pause, resume, skip, stop, queue, volume, loop, shuffle
 - **Status Updates**: Bot status updates to show currently playing track
 
 ### How to Use Music Commands
