@@ -11,7 +11,7 @@ if (typeof File === 'undefined') {
 }
 
 const { createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus, demuxProbe } = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
+const play = require('play-dl');
 const rateLimiter = require('../utils/rateLimiter');
 
 class MusicManager {
@@ -146,15 +146,19 @@ class MusicManager {
 
             while (streamRetryCount < maxStreamRetries) {
                 try {
-                    const stream = ytdl(previousTrack.url, {
-                        filter: 'audioonly',
-                        quality: 'highestaudio',
-                        highWaterMark: 1 << 25
+                    // Add timeout protection for streaming
+                    const streamPromise = play.stream(previousTrack.url, {
+                        quality: 2 // highest quality audio
                     });
 
-                    const { stream: newStream, type } = await demuxProbe(stream);
-                    resource = createAudioResource(newStream, {
-                        inputType: type,
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Stream timeout - YouTube is taking too long to respond')), 10000)
+                    );
+
+                    const streamData = await Promise.race([streamPromise, timeoutPromise]);
+
+                    resource = createAudioResource(streamData.stream, {
+                        inputType: streamData.type,
                         inlineVolume: true
                     });
                     break;
@@ -171,7 +175,15 @@ class MusicManager {
                     }
 
                     console.error('[VOICE] Failed to create audio stream:', streamError.message);
-                    throw new Error(`Failed to create audio stream: ${streamError.message}`);
+                    
+                    // Don't throw immediately on last retry, instead return false to continue queue
+                    if (streamRetryCount >= maxStreamRetries) {
+                        console.log('[VOICE] Max retries reached for previous track');
+                        return false;
+                    }
+                    console.log(`[VOICE] Previous track stream attempt ${streamRetryCount} failed, retrying...`);
+                    await new Promise(resolve => setTimeout(resolve, 2000 * streamRetryCount));
+                    continue;
                 }
             }
 
@@ -258,15 +270,19 @@ class MusicManager {
 
             while (streamRetryCount < maxStreamRetries) {
                 try {
-                    const stream = ytdl(nextTrack.url, {
-                        filter: 'audioonly',
-                        quality: 'highestaudio',
-                        highWaterMark: 1 << 25
+                    // Add timeout protection for streaming
+                    const streamPromise = play.stream(nextTrack.url, {
+                        quality: 2 // highest quality audio
                     });
 
-                    const { stream: newStream, type } = await demuxProbe(stream);
-                    resource = createAudioResource(newStream, {
-                        inputType: type,
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Stream timeout - YouTube is taking too long to respond')), 10000)
+                    );
+
+                    const streamData = await Promise.race([streamPromise, timeoutPromise]);
+
+                    resource = createAudioResource(streamData.stream, {
+                        inputType: streamData.type,
                         inlineVolume: true
                     });
                     break;
@@ -289,7 +305,9 @@ class MusicManager {
                         console.log('[VOICE] Max retries reached, skipping to next song');
                         return false;
                     }
-                    throw new Error(`Failed to create audio stream: ${streamError.message}`);
+                    console.log(`[VOICE] Stream attempt ${streamRetryCount} failed, retrying...`);
+                    await new Promise(resolve => setTimeout(resolve, 2000 * streamRetryCount));
+                    continue;
                 }
             }
 

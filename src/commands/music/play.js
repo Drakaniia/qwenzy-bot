@@ -340,17 +340,39 @@ module.exports = {
                     console.log('[DEBUG] Passed all checks, starting playback...');
                     
                     // Immediately acknowledge and show music controls
-                    await selectInteraction.update({
-                        content: `▶️ Now playing: **${selectedVideo.title}**`,
-                        components: createMusicButtons(selectInteraction.guild.id),
-                        embeds: []
-                    });
+                    try {
+                        await selectInteraction.update({
+                            content: `▶️ Now playing: **${selectedVideo.title}**`,
+                            components: createMusicButtons(selectInteraction.guild.id),
+                            embeds: []
+                        });
+                    } catch (updateError) {
+                        if (updateError.code === 10062) {
+                            console.log('[INFO] Interaction expired while updating playback');
+                            return;
+                        } else {
+                            throw updateError;
+                        }
+                    }
 
                     try {
-                        // Skip video info fetching for now to avoid rate limiting
-                        // Use the search results data instead
-                        console.log('[INFO] Using search result data to avoid YouTube rate limiting');
-                        const videoInfo = null;
+                        // Fetch complete video information from YouTube
+                        console.log('[INFO] Fetching video information from YouTube...');
+                        let videoInfo;
+                        
+                        try {
+                            videoInfo = await rateLimiter.execute(async () => {
+                                const info = await play.video_info(selectedVideo.url);
+                                console.log('[INFO] Successfully fetched video information');
+                                return info;
+                            });
+                        } catch (infoError) {
+                            console.error('[ERROR] Failed to fetch video info:', infoError.message);
+                            
+                            // If video info fails, try to continue with search result data as fallback
+                            console.log('[WARN] Falling back to search result data due to video info fetch failure');
+                            videoInfo = null;
+                        }
 
                         // Join voice channel if not connected
                         let connection = getVoiceConnection(selectInteraction.guild.id);
@@ -423,8 +445,16 @@ module.exports = {
                                 )
                             ]);
 
-                            // Create song object using search result data
-                            const song = {
+                            // Create song object using fetched video information or search result data as fallback
+                            const song = videoInfo ? {
+                                title: videoInfo.video_details.title,
+                                url: videoInfo.video_details.url,
+                                duration: videoInfo.video_details.durationRaw,
+                                channel: videoInfo.video_details.channel?.name || 'Unknown Channel',
+                                thumbnail: videoInfo.video_details.thumbnails?.[0]?.url || null,
+                                views: videoInfo.video_details.views || 0,
+                                uploadedAt: videoInfo.video_details.uploadedAt || null
+                            } : {
                                 title: selectedVideo.title,
                                 url: selectedVideo.url,
                                 duration: selectedVideo.durationRaw || 0,
