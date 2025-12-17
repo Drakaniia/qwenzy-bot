@@ -13,7 +13,6 @@ module.exports = {
                 .setDescription('Search query for YouTube videos')
                 .setRequired(true)),
     async execute(interaction) {
-        const { getVoiceConnection } = require('@discordjs/voice');
         const query = interaction.options.getString('query');
 
         try {

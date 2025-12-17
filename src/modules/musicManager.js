@@ -135,11 +135,14 @@ class MusicManager {
             while (streamRetryCount < maxStreamRetries) {
                 try {
                     const stream = await play.stream(previousTrack.url);
-                    resource = createAudioResource(stream.stream, { inputType: stream.type });
+                    resource = createAudioResource(stream.stream, {
+                        inputType: stream.type,
+                        inlineVolume: true
+                    });
                     break;
                 } catch (streamError) {
                     streamRetryCount++;
-                    
+
                     // Handle specific play-dl errors
                     if (streamError.message && streamError.message.includes('429') && streamRetryCount < maxStreamRetries) {
                         console.log(`[STREAM] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 5 seconds...`);
@@ -154,7 +157,7 @@ class MusicManager {
                     } else if (streamError.message && (streamError.message.includes('Private') || streamError.message.includes('403'))) {
                         throw new Error('This video is private or restricted and cannot be played');
                     }
-                    
+
                     console.error('[VOICE] Failed to create audio stream:', streamError.message);
                     throw new Error(`Failed to create audio stream: ${streamError.message}`);
                 }
@@ -185,7 +188,7 @@ class MusicManager {
     async playNext(guildId, interaction = null) {
         const queue = this.getQueue(guildId);
         const player = this.getPlayer(guildId);
-        
+
         if (!player || !queue || queue.length === 0) {
             // If no more songs in queue and no track is looping
             if (this.getLoopMode(guildId) !== 'track') {
@@ -244,11 +247,14 @@ class MusicManager {
             while (streamRetryCount < maxStreamRetries) {
                 try {
                     const stream = await play.stream(nextTrack.url);
-                    resource = createAudioResource(stream.stream, { inputType: stream.type });
+                    resource = createAudioResource(stream.stream, {
+                        inputType: stream.type,
+                        inlineVolume: true
+                    });
                     break;
                 } catch (streamError) {
                     streamRetryCount++;
-                    
+
                     // Handle specific play-dl errors
                     if (streamError.message && streamError.message.includes('429') && streamRetryCount < maxStreamRetries) {
                         console.log(`[STREAM] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 5 seconds...`);
@@ -263,7 +269,7 @@ class MusicManager {
                     } else if (streamError.message && (streamError.message.includes('Private') || streamError.message.includes('403'))) {
                         throw new Error('This video is private or restricted and cannot be played');
                     }
-                    
+
                     console.error('[VOICE] Failed to create audio stream:', streamError.message);
                     throw new Error(`Failed to create audio stream: ${streamError.message}`);
                 }
@@ -300,7 +306,7 @@ class MusicManager {
 
     async playSong(guildId, song, interaction, connection) {
         console.log(`[MUSIC] playSong called for guild ${guildId} with song: ${song.title}`);
-        
+
         if (!this.players.has(guildId)) {
             console.log(`[MUSIC] Creating new player for guild ${guildId}`);
             const player = createAudioPlayer();
@@ -325,7 +331,7 @@ class MusicManager {
 
             player.on('error', async (error) => {
                 console.error('[MUSIC] Audio player error:', error);
-                
+
                 let errorMessage = 'An error occurred while playing audio.';
                 if (error.message.includes('FFmpeg')) {
                     errorMessage = '❌ FFmpeg error: Audio format not supported. Please try another song.';
@@ -344,13 +350,13 @@ class MusicManager {
                         console.log('[MUSIC] Could not send error followUp:', followUpError.message);
                     }
                 }
-                
+
                 this.disconnect(guildId);
             });
         }
 
         const player = this.getPlayer(guildId);
-        
+
         // If there's an active connection, subscribe player to it
         if (connection) {
             console.log(`[MUSIC] Subscribing player to connection for guild ${guildId}`);
@@ -360,9 +366,9 @@ class MusicManager {
             console.log(`[MUSIC] No connection provided for guild ${guildId}`);
             if (interaction) {
                 try {
-                    await interaction.followUp({ 
-                        content: '❌ No voice connection available. Please make sure I\'m in a voice channel.', 
-                        flags: [64] 
+                    await interaction.followUp({
+                        content: '❌ No voice connection available. Please make sure I\'m in a voice channel.',
+                        flags: [64]
                     });
                 } catch (followUpError) {
                     console.log('[MUSIC] Could not send connection error:', followUpError.message);
@@ -373,7 +379,7 @@ class MusicManager {
 
         // Add the song to the queue and play if nothing is currently playing
         this.addToQueue(guildId, song, interaction.user);
-        
+
         // If player is idle or no current track, start playing immediately
         if (!this.getCurrentTrack(guildId) || player.state.status === AudioPlayerStatus.Idle) {
             console.log(`[MUSIC] Starting immediate playback for: ${song.title}`);
@@ -382,9 +388,9 @@ class MusicManager {
             console.log(`[MUSIC] Adding to queue: ${song.title} (current track exists, player status: ${player.state.status})`);
             // Otherwise, just add to queue
             try {
-                await interaction.followUp({ 
-                    content: `🎵 Added **${song.title}** to the queue!`, 
-                    flags: [64] 
+                await interaction.followUp({
+                    content: `🎵 Added **${song.title}** to the queue!`,
+                    flags: [64]
                 });
             } catch (followUpError) {
                 console.log('[MUSIC] Error adding to queue message:', followUpError.message);
@@ -422,15 +428,15 @@ class MusicManager {
     stop(guildId) {
         const player = this.getPlayer(guildId);
         const connection = this.getConnection(guildId);
-        
+
         if (player) {
             player.stop();
         }
-        
+
         if (connection) {
             connection.destroy();
         }
-        
+
         this.clearQueue(guildId);
         this.setCurrentTrack(guildId, null);
         return true;
@@ -439,17 +445,17 @@ class MusicManager {
     disconnect(guildId) {
         const connection = this.getConnection(guildId);
         const player = this.getPlayer(guildId);
-        
+
         if (player) {
             player.stop();
             this.players.delete(guildId);
         }
-        
+
         if (connection) {
             connection.destroy();
             this.connections.delete(guildId);
         }
-        
+
         this.currentTracks.delete(guildId);
         this.queues.delete(guildId);
         this.volumes.delete(guildId);
