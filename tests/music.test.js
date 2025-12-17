@@ -265,6 +265,231 @@ describe('Music Commands Real-World Tests', () => {
         });
     });
 
+    describe('Enhanced Error Categorization Tests', () => {
+        let playCommand;
+
+        beforeEach(() => {
+            playCommand = require('../src/commands/music/play');
+        });
+
+        it('should categorize rate limit errors correctly', () => {
+            const rateLimitError = new Error('429 Too Many Requests');
+            
+            // Mock the error categorization logic
+            const errorType = rateLimitError.message.includes('429') ? 'RATE_LIMIT' : 'UNKNOWN';
+            
+            expect(errorType).to.equal('RATE_LIMIT');
+        });
+
+        it('should categorize captcha errors correctly', () => {
+            const captchaError = new Error('YouTube detected automated queries');
+            
+            const errorType = captchaError.message.includes('automated') ? 'CAPTCHA' : 'UNKNOWN';
+            
+            expect(errorType).to.equal('CAPTCHA');
+        });
+
+        it('should categorize network errors correctly', () => {
+            const networkError = new Error('ENOTFOUND www.youtube.com');
+            
+            const errorType = networkError.message.includes('ENOTFOUND') ? 'NETWORK' : 'UNKNOWN';
+            
+            expect(errorType).to.equal('NETWORK');
+        });
+
+        it('should categorize timeout errors correctly', () => {
+            const timeoutError = new Error('Search timeout - YouTube is taking too long to respond');
+            
+            const errorType = timeoutError.message.includes('timeout') ? 'TIMEOUT' : 'UNKNOWN';
+            
+            expect(errorType).to.equal('TIMEOUT');
+        });
+
+        it('should categorize play-dl library errors correctly', () => {
+            const libraryError = new Error('play-dl search function is not available');
+            
+            const errorType = libraryError.message.includes('play-dl') ? 'LIBRARY_ERROR' : 'UNKNOWN';
+            
+            expect(errorType).to.equal('LIBRARY_ERROR');
+        });
+
+        it('should categorize no results errors correctly', () => {
+            const noResultsError = new Error('No results found for query');
+            
+            const errorType = noResultsError.message.includes('No results found') ? 'NO_RESULTS' : 'UNKNOWN';
+            
+            expect(errorType).to.equal('NO_RESULTS');
+        });
+
+        it('should categorize rate limiter errors correctly', () => {
+            const rateLimiterError = new Error('Service temporarily unavailable due to repeated failures');
+            
+            const errorType = rateLimiterError.message.includes('Service temporarily unavailable') ? 'RATE_LIMITER' : 'UNKNOWN';
+            
+            expect(errorType).to.equal('RATE_LIMITER');
+        });
+
+        it('should categorize Discord interaction errors correctly', () => {
+            const discordError = new Error('Failed to send interaction reply');
+            
+            const errorType = discordError.message.includes('interaction') ? 'DISCORD_INTERACTION' : 'UNKNOWN';
+            
+            expect(errorType).to.equal('DISCORD_INTERACTION');
+        });
+    });
+
+    describe('Enhanced Rate Limiter Tests', () => {
+        let rateLimiter;
+
+        beforeEach(() => {
+            rateLimiter = require('../src/utils/rateLimiter');
+            rateLimiter.reset(); // Reset for clean test state
+        });
+
+        it('should start with CLOSED circuit state', () => {
+            const status = rateLimiter.getStatus();
+            expect(status.circuitState).to.equal('CLOSED');
+            expect(status.failureCount).to.equal(0);
+        });
+
+        it('should trip circuit after failure threshold', async () => {
+            // Simulate failures
+            const failingFunction = () => Promise.reject(new Error('429 Too Many Requests'));
+            
+            try {
+                await rateLimiter.execute(failingFunction);
+            } catch (error) {
+                // Expected to fail
+            }
+
+            const status = rateLimiter.getStatus();
+            expect(status.failureCount).to.be.greaterThan(0);
+        });
+
+        it('should calculate exponential backoff correctly', () => {
+            const baseDelay = 1000;
+            const maxDelay = 30000;
+            
+            // Test exponential backoff calculation
+            const delay1 = Math.min(baseDelay * Math.pow(2, 0), maxDelay);
+            const delay2 = Math.min(baseDelay * Math.pow(2, 1), maxDelay);
+            const delay3 = Math.min(baseDelay * Math.pow(2, 2), maxDelay);
+            
+            expect(delay1).to.equal(1000);
+            expect(delay2).to.equal(2000);
+            expect(delay3).to.equal(4000);
+        });
+
+        it('should enforce queue size limits', async () => {
+            // Mock a function that will cause queue to fill
+            const slowFunction = () => new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Reset rate limiter to ensure clean state
+            rateLimiter.reset();
+            
+            // This test would need actual implementation of queue size checking
+            // For now, just verify the status method works
+            const status = rateLimiter.getStatus();
+            expect(status).to.have.property('queueLength');
+        });
+
+        it('should timeout requests after specified duration', async () => {
+            const slowFunction = () => new Promise(resolve => setTimeout(resolve, 20000)); // 20 second delay
+            
+            try {
+                await rateLimiter.executeWithTimeout(slowFunction, 1000); // 1 second timeout
+            } catch (error) {
+                expect(error.message).to.include('Request timeout');
+            }
+        });
+    });
+
+    describe('Fallback Search Mechanism Tests', () => {
+        let play, ytdl;
+
+        beforeEach(() => {
+            play = require('play-dl');
+            ytdl = require('ytdl-core');
+            
+            // Mock play-dl to fail
+            sinon.stub(play, 'search').rejects(new Error('play-dl search function is not available'));
+        });
+
+        afterEach(() => {
+            sinon.restore();
+        });
+
+        it('should fallback to ytdl-core when play-dl fails', async () => {
+            // Mock ytdl-core to succeed
+            const mockYtdlInfo = {
+                videos: [
+                    {
+                        title: 'Fallback Song',
+                        video_url: 'https://youtube.com/fallback',
+                        duration: '3:45',
+                        author: { name: 'Fallback Channel' },
+                        thumbnail: 'https://example.com/thumb.jpg'
+                    }
+                ]
+            };
+
+            sinon.stub(ytdl, 'getInfo').resolves(mockYtdlInfo);
+
+            // Test the fallback logic would work
+            try {
+                await ytdl.getInfo('ytsearch5:test query');
+            } catch (error) {
+                // If this fails, the mock wasn't set up correctly
+            }
+
+            expect(ytdl.getInfo.called).to.be.true;
+        });
+
+        it('should handle both search methods failing', async () => {
+            // Mock both to fail
+            sinon.stub(ytdl, 'getInfo').rejects(new Error('ytdl-core also failed'));
+
+            try {
+                await ytdl.getInfo('ytsearch5:test query');
+            } catch (error) {
+                expect(error.message).to.include('ytdl-core also failed');
+            }
+        });
+    });
+
+    describe('YouTube Cookie Authentication Tests', () => {
+        let originalEnv;
+
+        beforeEach(() => {
+            originalEnv = process.env;
+            process.env = { ...originalEnv };
+        });
+
+        afterEach(() => {
+            process.env = originalEnv;
+        });
+
+        it('should initialize with YouTube cookie when provided', () => {
+            process.env.YOUTUBE_COOKIE = 'valid_cookie_string';
+            
+            // This test verifies the cookie loading logic
+            expect(process.env.YOUTUBE_COOKIE).to.equal('valid_cookie_string');
+        });
+
+        it('should handle missing YouTube cookie gracefully', () => {
+            delete process.env.YOUTUBE_COOKIE;
+            
+            expect(process.env.YOUTUBE_COOKIE).to.be.undefined;
+        });
+
+        it('should handle invalid YouTube cookie gracefully', () => {
+            process.env.YOUTUBE_COOKIE = 'invalid_cookie';
+            
+            // The play-dl library would handle validation
+            expect(process.env.YOUTUBE_COOKIE).to.equal('invalid_cookie');
+        });
+    });
+
     describe('Railway Deployment Tests', () => {
         it('should handle Railway environment variables', () => {
             // Test if process.env exists

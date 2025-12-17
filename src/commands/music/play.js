@@ -18,10 +18,29 @@ const rateLimiter = require('../../utils/rateLimiter');
 const musicManager = require('../../modules/musicManager'); // Import the music manager
 
 // Initialize play-dl with proper YouTube cookie/session if available
+let youtubeCookieValid = false;
 if (process.env.YOUTUBE_COOKIE) {
-    play.setToken({
-        youtube: process.env.YOUTUBE_COOKIE
-    });
+    try {
+        play.setToken({
+            youtube: process.env.YOUTUBE_COOKIE
+        });
+        youtubeCookieValid = true;
+        console.log('[INIT] YouTube cookie loaded successfully');
+    } catch (cookieError) {
+        console.error('[INIT] Failed to load YouTube cookie:', cookieError.message);
+        console.log('[INIT] Continuing without YouTube cookie (may experience rate limits)');
+    }
+} else {
+    console.log('[INIT] No YouTube cookie provided - rate limits may apply');
+}
+
+// Initialize play-dl with basic configuration
+try {
+    play.update();
+    console.log('[INIT] play-dl library updated successfully');
+} catch (updateError) {
+    console.warn('[INIT] Warning: Could not update play-dl library:', updateError.message);
+    console.log('[INIT] This is not critical, continuing with available library functions');
 }
 
 // Helper function to check if interaction is expired
@@ -93,11 +112,18 @@ module.exports = {
                             throw new Error('play-dl search function is not available');
                         }
 
-                        const results = await play.search(query, {
+                        // Add timeout protection for search operations
+                        const searchPromise = play.search(query, {
                             limit: 5,
                             source: { youtube: 'video' },
                             type: 'video'
                         });
+
+                        const timeoutPromise = new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Search timeout - YouTube is taking too long to respond')), 15000)
+                        );
+
+                        const results = await Promise.race([searchPromise, timeoutPromise]);
 
                         console.log(`[SEARCH] Found ${results.length} results`);
 
@@ -127,11 +153,34 @@ module.exports = {
                         });
                         return;
                     } else if (searchError.message && searchError.message.includes('play-dl search function is not available')) {
-                        console.error('[SEARCH] play-dl library issue detected');
-                        await interaction.editReply({
-                            content: `❌ Internal error: Music search library is not functioning properly. Please contact the bot administrator.`,
-                        });
-                        return;
+                        console.error('[SEARCH] play-dl library issue detected, trying fallback method');
+                        
+                        // Fallback: Try using ytdl-core search
+                        try {
+                            console.log('[SEARCH] Using ytdl-core fallback search');
+                            const ytdlInfo = await ytdl.getInfo(`ytsearch5:${query}`);
+                            
+                            const fallbackResults = ytdlInfo.videos.slice(0, 5).map(video => ({
+                                title: video.title || 'Unknown Title',
+                                url: video.video_url,
+                                duration: video.duration || 0,
+                                durationRaw: video.duration || '0:00',
+                                durationFormatted: video.duration || 'N/A',
+                                channel: { name: video.author?.name || 'Unknown Channel' },
+                                thumbnail: video.thumbnail || null
+                            }));
+                            
+                            console.log(`[SEARCH] Fallback search found ${fallbackResults.length} results`);
+                            searchResults = fallbackResults;
+                            break;
+                            
+                        } catch (fallbackError) {
+                            console.error('[SEARCH] Fallback search also failed:', fallbackError.message);
+                            await interaction.editReply({
+                                content: `❌ Both primary and fallback search methods failed. YouTube may be experiencing issues. Please try again later.`,
+                            });
+                            return;
+                        }
                     } else {
                         console.error('[SEARCH] Unexpected search error:', searchError);
                         // For other errors, we continue to retry
@@ -482,20 +531,57 @@ module.exports = {
                 }
             });
         } catch (error) {
-            console.error('Search command error:', error);
+            const timestamp = new Date().toISOString();
+            const errorContext = {
+                timestamp,
+                query,
+                guild: interaction.guild?.id,
+                user: interaction.user?.tag,
+                error: {
+                    message: error.message,
+                    code: error.code,
+                    status: error.status,
+                    stack: error.stack
+                }
+            };
+
+            console.error(`[ERROR][${timestamp}] Search command error:`, JSON.stringify(errorContext, null, 2));
 
             let errorMessage = 'An error occurred while searching for music.';
+            let errorType = 'UNKNOWN';
 
-            // Handle specific 429 rate limit error
+            // Enhanced error categorization
             if (error.message && error.message.includes('429')) {
                 errorMessage = '⚠️ YouTube rate limit reached. Please wait a moment and try again.';
-            } else if (error.message && error.message.includes('Captcha')) {
+                errorType = 'RATE_LIMIT';
+            } else if (error.message && error.message.includes('Captcha') || error.message.includes('bot') || error.message.includes('automated')) {
                 errorMessage = '⚠️ YouTube detected bot activity. Please try again in a few minutes.';
+                errorType = 'CAPTCHA';
             } else if (error.code === 10062) {
-                // Unknown interaction - interaction expired
-                console.log('[INFO] Interaction expired, cannot respond');
+                console.log(`[INFO][${timestamp}] Interaction expired, cannot respond`);
+                errorType = 'INTERACTION_EXPIRED';
                 return;
+            } else if (error.message && error.message.includes('ENOTFOUND') || error.message.includes('network')) {
+                errorMessage = '⚠️ Network error. Please check your internet connection and try again.';
+                errorType = 'NETWORK';
+            } else if (error.message && error.message.includes('timeout')) {
+                errorMessage = '⚠️ Search timeout. YouTube is taking too long to respond. Please try again.';
+                errorType = 'TIMEOUT';
+            } else if (error.message && error.message.includes('play-dl')) {
+                errorMessage = '⚠️ Music library error. Please try again in a moment.';
+                errorType = 'LIBRARY_ERROR';
+            } else if (error.message && error.message.includes('No results found')) {
+                errorMessage = '⚠️ No results found. Try a different search term.';
+                errorType = 'NO_RESULTS';
+            } else if (error.message && error.message.includes('rateLimiter')) {
+                errorMessage = '⚠️ Rate limiting error. Please wait a moment and try again.';
+                errorType = 'RATE_LIMITER';
+            } else if (error.message && error.message.includes('interaction') || error.message.includes('reply')) {
+                errorMessage = '⚠️ Discord interaction error. Please try the command again.';
+                errorType = 'DISCORD_INTERACTION';
             }
+
+            console.log(`[ERROR][${timestamp}] Categorized error as ${errorType}: ${errorMessage}`);
 
             try {
                 if (interaction.replied || interaction.deferred) {
@@ -504,10 +590,13 @@ module.exports = {
                     await interaction.reply({ content: errorMessage, flags: [64] });
                 }
             } catch (replyError) {
+                console.error(`[ERROR][${timestamp}] Failed to send error message:`, {
+                    error: replyError.message,
+                    code: replyError.code,
+                    originalError: errorType
+                });
                 if (replyError.code === 10062) {
-                    console.log('[INFO] Interaction expired, cannot send error message');
-                } else {
-                    console.error('Failed to send error message:', replyError);
+                    console.log(`[INFO][${timestamp}] Interaction expired, cannot send error message`);
                 }
             }
         }
