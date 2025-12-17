@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getVoiceConnection, joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
-const play = require('play-dl');
+const ytdl = require('@distube/ytdl-core');
+const ytsr = require('ytsr');
 const rateLimiter = require('../../utils/rateLimiter');
 const musicManager = require('../../modules/musicManager'); // Import the music manager
 
@@ -66,7 +67,16 @@ module.exports = {
 
                 try {
                     searchResults = await rateLimiter.execute(async () => {
-                        return await play.search(query, { limit: 5 });
+                        const results = await ytsr.search(query, { limit: 5 });
+                        // Format the results to match the expected structure
+                        return results.map(result => ({
+                            title: result.title,
+                            url: result.url,
+                            duration: result.duration,
+                            durationRaw: result.duration,
+                            channel: { name: result.channel?.name || 'Unknown Channel' },
+                            thumbnail: { url: result.thumbnail?.url || null }
+                        }));
                     });
                     break;
                 } catch (searchError) {

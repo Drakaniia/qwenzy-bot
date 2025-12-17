@@ -1,5 +1,5 @@
 const { createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus } = require('@discordjs/voice');
-const play = require('play-dl');
+const ytdl = require('@distube/ytdl-core');
 const rateLimiter = require('../utils/rateLimiter');
 
 class MusicManager {
@@ -134,26 +134,25 @@ class MusicManager {
 
             while (streamRetryCount < maxStreamRetries) {
                 try {
-                    const stream = await play.stream(previousTrack.url);
-                    resource = createAudioResource(stream.stream, {
-                        inputType: stream.type,
+                    const stream = ytdl(previousTrack.url, {
+                        filter: 'audioonly',
+                        quality: 'highestaudio',
+                        highWaterMark: 1 << 25
+                    });
+
+                    resource = createAudioResource(stream, {
+                        inputType: 'opus',
                         inlineVolume: true
                     });
                     break;
                 } catch (streamError) {
                     streamRetryCount++;
 
-                    // Handle specific play-dl errors
+                    // Handle specific ytdl-core errors
                     if (streamError.message && streamError.message.includes('429') && streamRetryCount < maxStreamRetries) {
                         console.log(`[STREAM] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 5 seconds...`);
                         await new Promise(resolve => setTimeout(resolve, 5000 * streamRetryCount));
                         continue;
-                    } else if (streamError.message && streamError.message.includes('trim')) {
-                        console.log(`[STREAM] play-dl trim error, retry ${streamRetryCount}/${maxStreamRetries} in 2 seconds...`);
-                        if (streamRetryCount < maxStreamRetries) {
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                            continue;
-                        }
                     } else if (streamError.message && (streamError.message.includes('Private') || streamError.message.includes('403'))) {
                         throw new Error('This video is private or restricted and cannot be played');
                     }
@@ -244,35 +243,33 @@ class MusicManager {
             const maxStreamRetries = 3;
             console.log(`[MUSIC] Starting stream creation for: ${nextTrack.url}`);
 
-            // Original streaming code (commented out due to rate limiting)
             while (streamRetryCount < maxStreamRetries) {
                 try {
-                    const stream = await play.stream(nextTrack.url);
-                    resource = createAudioResource(stream.stream, {
-                        inputType: stream.type,
+                    const stream = ytdl(nextTrack.url, {
+                        filter: 'audioonly',
+                        quality: 'highestaudio',
+                        highWaterMark: 1 << 25
+                    });
+
+                    resource = createAudioResource(stream, {
+                        inputType: 'opus',
                         inlineVolume: true
                     });
                     break;
                 } catch (streamError) {
                     streamRetryCount++;
 
-                    // Handle specific play-dl errors
+                    // Handle specific ytdl-core errors
                     if (streamError.message && streamError.message.includes('429') && streamRetryCount < maxStreamRetries) {
                         console.log(`[STREAM] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 10 seconds...`);
                         await new Promise(resolve => setTimeout(resolve, 10000 * streamRetryCount));
                         continue;
-                    } else if (streamError.message && streamError.message.includes('trim')) {
-                        console.log(`[STREAM] play-dl trim error, retry ${streamRetryCount}/${maxStreamRetries} in 2 seconds...`);
-                        if (streamRetryCount < maxStreamRetries) {
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                            continue;
-                        }
                     } else if (streamError.message && (streamError.message.includes('Private') || streamError.message.includes('403'))) {
                         throw new Error('This video is private or restricted and cannot be played');
                     }
 
                     console.error('[VOICE] Failed to create audio stream:', streamError.message);
-                    
+
                     // Don't throw immediately on last retry, instead return false to continue queue
                     if (streamRetryCount >= maxStreamRetries) {
                         console.log('[VOICE] Max retries reached, skipping to next song');
