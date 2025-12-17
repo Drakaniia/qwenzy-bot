@@ -79,7 +79,7 @@ module.exports = {
 
                 try {
                     searchResults = await rateLimiter.execute(async () => {
-                        const results = await ytsr(query, { limit: 5 });
+                        const results = await ytsr.search(query, { limit: 5 });
                         // Format the results to match the expected structure
                         return results.items.filter(item => item.type === 'video').slice(0, 5).map(result => ({
                             title: result.title,
