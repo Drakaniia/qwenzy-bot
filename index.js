@@ -68,7 +68,8 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildVoiceStates
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMembers // Added for member join events
     ]
 });
 
@@ -121,10 +122,10 @@ client.once(Events.ClientReady, async () => {
     try {
         const { generateDependencyReport } = require('@discordjs/voice');
         const ffmpeg = require('ffmpeg-static');
-        
+
         console.log('[INFO] 🎵 Voice dependencies validated successfully.');
         console.log('[INFO] 📦 FFmpeg path:', ffmpeg);
-        
+
         // Optional: Log dependency report for debugging
         // console.log(generateDependencyReport());
     } catch (error) {
