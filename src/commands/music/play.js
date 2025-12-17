@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType, PermissionFlagsBits } = require('discord.js');
 const { getVoiceConnection } = require('@discordjs/voice');
 const play = require('play-dl');
 const rateLimiter = require('../../utils/rateLimiter');
@@ -14,7 +14,7 @@ module.exports = {
     async execute(interaction) {
         const { getVoiceConnection } = require('@discordjs/voice');
         const query = interaction.options.getString('query');
-        
+
         try {
             // Reply immediately to show the bot is working
             await interaction.reply({ content: '🔍 Searching...', flags: [] });
@@ -23,7 +23,7 @@ module.exports = {
             let searchResults;
             let retryCount = 0;
             const maxRetries = 3;
-            
+
             while (retryCount < maxRetries) {
                 try {
                     searchResults = await rateLimiter.execute(async () => {
@@ -40,7 +40,7 @@ module.exports = {
                     }
                 }
             }
-            
+
             if (searchResults.length === 0) {
                 return interaction.editReply({ content: 'No results found for your search!' });
             }
@@ -66,10 +66,10 @@ module.exports = {
                 timestamp: new Date().toISOString(),
             };
 
-            await interaction.editReply({ 
+            await interaction.editReply({
                 content: '',
-                embeds: [embed], 
-                components: [row] 
+                embeds: [embed],
+                components: [row]
             });
 
             const collector = interaction.channel.createMessageComponentCollector({
@@ -102,7 +102,7 @@ module.exports = {
 
                     // Check bot permissions for voice channel
                     const permissions = voiceChannel.permissionsFor(selectInteraction.client.user);
-                    if (!permissions.has('CONNECT') || !permissions.has('SPEAK')) {
+                    if (!permissions.has(PermissionFlagsBits.Connect) || !permissions.has(PermissionFlagsBits.Speak)) {
                         await selectInteraction.update({
                             content: '❌ I need permission to connect and speak in your voice channel!',
                             components: [],
@@ -112,7 +112,7 @@ module.exports = {
                     }
 
                     // Check if voice channel is full
-                    if (voiceChannel.full && !permissions.has('MOVE_MEMBERS')) {
+                    if (voiceChannel.full && !permissions.has(PermissionFlagsBits.MoveMembers)) {
                         await selectInteraction.update({
                             content: '❌ The voice channel is full and I cannot move members!',
                             components: [],
@@ -133,10 +133,10 @@ module.exports = {
                     }
 
                     await selectInteraction.update({
-                                                content: `🔌 Connecting to voice channel... 🎵 **${selectedVideo.title}**`,
-                                                components: [],
-                                                embeds: []
-                                            });
+                        content: `🔌 Connecting to voice channel... 🎵 **${selectedVideo.title}**`,
+                        components: [],
+                        embeds: []
+                    });
                     // Direct playback without calling play command again
                     try {
                         const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
@@ -151,7 +151,7 @@ module.exports = {
                         let videoInfo;
                         let infoRetryCount = 0;
                         const maxInfoRetries = 3;
-                        
+
                         while (infoRetryCount < maxInfoRetries) {
                             try {
                                 videoInfo = await rateLimiter.execute(async () => {
@@ -168,12 +168,12 @@ module.exports = {
                                 }
                             }
                         }
-                        
+
                         // Enhanced stream handling with fallbacks and retry logic
                         let resource;
                         let streamRetryCount = 0;
                         const maxStreamRetries = 3;
-                        
+
                         while (streamRetryCount < maxStreamRetries) {
                             try {
                                 const stream = await play.stream(videoInfo.url);
@@ -188,7 +188,7 @@ module.exports = {
                                     await new Promise(resolve => setTimeout(resolve, 5000 * streamRetryCount));
                                     continue;
                                 }
-                                
+
                                 console.warn('[VOICE] demuxProbe failed, falling back to default stream:', probeError.message);
                                 try {
                                     const stream = await play.stream(videoInfo.url);
@@ -207,7 +207,7 @@ module.exports = {
                             }
                         }
                         const player = createAudioPlayer();
-                        
+
                         let connection = getVoiceConnection(selectInteraction.guild.id);
                         if (!connection) {
                             connection = joinVoiceChannel({
@@ -253,17 +253,17 @@ module.exports = {
                             await selectInteraction.editReply({
                                 content: `🔊 Establishing voice connection... 🎵 **${selectedVideo.title}**`
                             });
-                            
+
                             await entersState(connection, VoiceConnectionStatus.Ready, 15000);
-                            
+
                             await selectInteraction.editReply({
                                 content: `▶️ Now playing: **${selectedVideo.title}**`
                             });
                         } catch (error) {
                             console.error('[VOICE] Connection timeout:', error);
-                            await selectInteraction.followUp({ 
-                                content: '❌ Failed to connect to voice channel. Please check my permissions and try again.', 
-                                flags: [64] 
+                            await selectInteraction.followUp({
+                                content: '❌ Failed to connect to voice channel. Please check my permissions and try again.',
+                                flags: [64]
                             });
                             connection.destroy();
                             return;
@@ -304,7 +304,7 @@ module.exports = {
                         player.on('error', error => {
                             console.error('Audio player error:', error);
                             let errorMessage = 'An error occurred while playing audio.';
-                            
+
                             if (error.message.includes('FFmpeg')) {
                                 errorMessage = '❌ FFmpeg error: Audio format not supported. Please try another song.';
                             } else if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
@@ -314,7 +314,7 @@ module.exports = {
                             } else if (error.message.includes('429')) {
                                 errorMessage = '❌ Rate limited: Too many requests. Please wait a moment and try again.';
                             }
-                            
+
                             selectInteraction.followUp({ content: errorMessage, flags: [64] });
                             connection.destroy();
                             selectInteraction.client.user.setActivity(null);
@@ -322,9 +322,9 @@ module.exports = {
 
                     } catch (error) {
                         console.error('Playback error:', error);
-                        
+
                         let errorMessage = 'An error occurred while playing music.';
-                        
+
                         // Provide specific error messages based on common issues
                         if (error.message.includes('FFmpeg')) {
                             errorMessage = '❌ FFmpeg error: Audio processing failed. This might be due to an unsupported video format.';
@@ -341,9 +341,9 @@ module.exports = {
                         } else if (error.message.includes('stream')) {
                             errorMessage = '❌ Stream error: Unable to process audio from this video. Please try another song.';
                         }
-                        
+
                         await selectInteraction.followUp({ content: errorMessage, flags: [64] });
-                        
+
                         if (connection) {
                             connection.destroy();
                         }
@@ -351,14 +351,14 @@ module.exports = {
                         selectInteraction.client.user.setActivity(null);
                     }
                 }
-                
+
                 collector.stop();
             });
 
             collector.on('end', (collected, reason) => {
                 if (reason === 'time') {
                     try {
-                        interaction.editReply({ 
+                        interaction.editReply({
                             components: [],
                             content: 'Search selection timed out. Please run /play again.'
                         }).catch(() => {
@@ -373,9 +373,9 @@ module.exports = {
 
         } catch (error) {
             console.error('Search command error:', error);
-            
+
             let errorMessage = 'An error occurred while searching for music.';
-            
+
             // Handle specific 429 rate limit error
             if (error.message && error.message.includes('429')) {
                 errorMessage = '⚠️ YouTube rate limit reached. Please wait a moment and try again.';
@@ -386,7 +386,7 @@ module.exports = {
                 console.log('[INFO] Interaction expired, cannot respond');
                 return;
             }
-            
+
             try {
                 if (interaction.replied || interaction.deferred) {
                     await interaction.followUp({ content: errorMessage, flags: [64] });
