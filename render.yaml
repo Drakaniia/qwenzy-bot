@@ -19,11 +19,11 @@ services:
   # Lavalink configuration for production
   # You can use a free Lavalink service or self-host one
   - key: LAVALINK_HOST
-    value: lavalink.darrennathanael.com
+    value: lava-v4.ajieblogs.eu.org
   - key: LAVALINK_PORT
-    value: 2333
+    value: 80
   - key: LAVALINK_PASSWORD
-    value: "Raththapala@2004"
+    value: "https://dsc.gg/ajidevserver"
   - key: LAVALINK_SECURE
     value: "false"
   - key: LAVALINK_SEARCH_PREFIX
