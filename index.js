@@ -41,7 +41,7 @@ const path = require('path');
 // but it's good practice to have one for health checks
 const express = require('express');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = parseInt(process.env.PORT) || 3000;
 
 // Health check endpoint for Wispbyte or similar hosting platforms
 app.get('/', (req, res) => {
@@ -58,10 +58,22 @@ app.get('/ping', (req, res) => {
     res.status(200).send('pong');
 });
 
-// Keep the server running for platforms that need it
-const server = app.listen(PORT, () => {
-    console.log(`Health check server running on port ${PORT}`);
-});
+// Function to find an available port
+function startServer(port) {
+    const server = app.listen(port, () => {
+        console.log(`Health check server running on port ${port}`);
+    }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.log(`Port ${port} is busy, trying port ${port + 1}...`);
+            startServer(port + 1); // Recursively try the next port
+        } else {
+            console.error('Server error:', err);
+        }
+    });
+}
+
+// Start the server
+startServer(PORT);
 
 const client = new Client({
     intents: [
