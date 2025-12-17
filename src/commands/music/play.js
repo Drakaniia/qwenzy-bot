@@ -78,6 +78,7 @@ module.exports = {
             });
 
             collector.on('collect', async (selectInteraction) => {
+                console.log('[DEBUG] Selection received from user:', selectInteraction.user.tag);
                 if (selectInteraction.user.id !== interaction.user.id) {
                     await selectInteraction.reply({
                         content: 'You can only use the search results that you requested!',
@@ -87,10 +88,13 @@ module.exports = {
                 }
 
                 const selectedVideo = searchResults.find(video => video.url === selectInteraction.values[0]);
+                console.log('[DEBUG] Selected video:', selectedVideo?.title || 'not found');
 
                 if (selectedVideo) {
                     // Comprehensive permission and voice channel checks
                     const voiceChannel = selectInteraction.member.voice.channel;
+                    console.log('[DEBUG] Voice channel:', voiceChannel?.id || 'null');
+
                     if (!voiceChannel) {
                         await selectInteraction.update({
                             content: '❌ You need to be in a voice channel to play music!',
@@ -102,6 +106,12 @@ module.exports = {
 
                     // Check bot permissions for voice channel
                     const permissions = voiceChannel.permissionsFor(selectInteraction.client.user);
+                    console.log('[DEBUG] Bot permissions:', {
+                        connect: permissions.has(PermissionFlagsBits.Connect),
+                        speak: permissions.has(PermissionFlagsBits.Speak),
+                        viewChannel: permissions.has(PermissionFlagsBits.ViewChannel)
+                    });
+
                     if (!permissions.has(PermissionFlagsBits.Connect) || !permissions.has(PermissionFlagsBits.Speak)) {
                         await selectInteraction.update({
                             content: '❌ I need permission to connect and speak in your voice channel!',
@@ -123,6 +133,8 @@ module.exports = {
 
                     // Check if user is in the same voice channel as bot
                     const existingConnection = getVoiceConnection(selectInteraction.guild.id);
+                    console.log('[DEBUG] Existing connection:', existingConnection ? 'found' : 'none');
+
                     if (existingConnection && existingConnection.joinConfig.channelId !== voiceChannel.id) {
                         await selectInteraction.update({
                             content: '❌ I am already playing in another voice channel! Please use that channel or wait for me to finish.',
@@ -132,11 +144,13 @@ module.exports = {
                         return;
                     }
 
+                    console.log('[DEBUG] Passed all checks, updating message...');
                     await selectInteraction.update({
                         content: `🔌 Connecting to voice channel... 🎵 **${selectedVideo.title}**`,
                         components: [],
                         embeds: []
                     });
+                    console.log('[DEBUG] Message updated, starting playback...');
                     // Direct playback without calling play command again
                     try {
                         const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
@@ -209,12 +223,15 @@ module.exports = {
                         const player = createAudioPlayer();
 
                         let connection = getVoiceConnection(selectInteraction.guild.id);
+                        console.log('[DEBUG] Creating connection, existing:', !!connection);
                         if (!connection) {
+                            console.log('[DEBUG] Joining voice channel:', voiceChannel.id);
                             connection = joinVoiceChannel({
                                 channelId: voiceChannel.id,
                                 guildId: selectInteraction.guild.id,
                                 adapterCreator: selectInteraction.guild.voiceAdapterCreator,
                             });
+                            console.log('[DEBUG] Voice channel join initiated');
 
                             // Monitor connection state
                             connection.on(VoiceConnectionStatus.Signalling, () => {
@@ -321,7 +338,9 @@ module.exports = {
                         });
 
                     } catch (error) {
-                        console.error('Playback error:', error);
+                        console.error('[ERROR] Playback error occurred:');
+                        console.error('[ERROR] Message:', error.message);
+                        console.error('[ERROR] Stack:', error.stack);
 
                         let errorMessage = 'An error occurred while playing music.';
 

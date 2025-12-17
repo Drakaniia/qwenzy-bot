@@ -166,7 +166,11 @@ client.on('interactionCreate', async interaction => {
                 await interaction.reply({ content: 'There was an error while executing this command!', flags: [64] });
             }
         } catch (replyError) {
-            console.error('Failed to send error reply:', replyError);
+            if (replyError.code === 40060) {
+                console.log('[INFO] Interaction already acknowledged, skipping error reply');
+            } else {
+                console.error('Failed to send error reply:', replyError);
+            }
         }
     }
 });

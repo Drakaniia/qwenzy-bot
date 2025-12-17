@@ -45,12 +45,20 @@ docker run -d --name qwenzy-bot --env-file .env -p 3000:3000 qwenzy-bot
 
 # Run with custom environment variables
 docker run -d --name qwenzy-bot -e DISCORD_TOKEN=your_token -e GEMINI_API_KEY=your_key -e CLIENT_ID=your_client_id -e GUILD_ID=your_guild_id -e PORT=3000 -p 3000:3000 qwenzy-bot
+
+# If environment variables are not set, the bot starts a health check server only
+docker run -d --name qwenzy-bot -p 3000:3000 qwenzy-bot
 ```
 
-### Running with Docker Compose (if you create a docker-compose.yml)
+### Running with Docker Compose
 ```bash
 docker-compose up -d
 ```
+
+### Docker Container Health Check
+If the bot starts without required environment variables (DISCORD_TOKEN or CLIENT_ID), it will run a health check server instead of connecting to Discord:
+- Root endpoint: http://localhost:3000
+- Health endpoint: http://localhost:3000/health
 
 > Note: The bot uses the PORT environment variable to determine which port to run on. By default, the Dockerfile exposes port 3000, which is the default value if PORT is not specified in your .env file.
 
