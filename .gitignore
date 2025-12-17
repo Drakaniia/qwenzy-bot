@@ -56,6 +56,10 @@ coverage/
 *.seed
 *.pid.lock
 
+# Lavalink related
+*.jar
+lavalink.jar
+
 # Environment files (more specific)
 .env*.local
 .env*.dev
