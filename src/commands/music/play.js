@@ -324,23 +324,6 @@ module.exports = {
                                 thumbnail: selectedVideo.thumbnail || null
                             };
 
-                            // For now, just join the voice channel and show controls
-                            // Skip actual audio playback due to YouTube rate limiting
-                            console.log('[MUSIC] Joining voice channel and showing controls (audio playback disabled due to rate limiting)');
-                            
-                            try {
-                                // Update the message with current status
-                                await selectInteraction.editReply({
-                                    content: `🎵 **${song.title}** is ready! ⚠️ Audio playback temporarily disabled due to YouTube rate limiting. The bot is in your voice channel.`,
-                                    components: createMusicButtons(selectInteraction.guild.id)
-                                });
-                            } catch (editError) {
-                                if (editError.code === 10062) {
-                                    console.log('[INFO] Interaction expired while updating song ready message');
-                                } else {
-                                    console.error('Error updating song ready message:', editError);
-                                }
-                            }
                             
                             // Set bot activity
                             try {
