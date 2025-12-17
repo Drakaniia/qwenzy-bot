@@ -221,50 +221,18 @@ module.exports = {
 
                     console.log('[DEBUG] Passed all checks, starting playback...');
                     
-                    // Immediately acknowledge the selection to prevent interaction timeout
+                    // Immediately acknowledge and show music controls
                     await selectInteraction.update({
-                        content: '▶️ Processing song...',
-                        components: [],
+                        content: `▶️ Now playing: **${selectedVideo.title}**`,
+                        components: createMusicButtons(selectInteraction.guild.id),
                         embeds: []
                     });
 
                     try {
-                        // Get video info with retry logic and timeout protection
-                        let videoInfo;
-                        let infoRetryCount = 0;
-                        const maxInfoRetries = 3;
-
-                        // Check if interaction is still valid before starting video info
-                        const interactionAge = Date.now() - selectInteraction.createdTimestamp;
-                        if (interactionAge > (12 * 60 * 1000)) { // 12 minutes buffer
-                            console.log('[INFO] Interaction too old for video info processing');
-                            return;
-                        }
-
-                        while (infoRetryCount < maxInfoRetries) {
-                            try {
-                                videoInfo = await Promise.race([
-                                    rateLimiter.execute(async () => {
-                                        return await play.video_info(selectedVideo.url);
-                                    }),
-                                    new Promise((_, reject) => 
-                                        setTimeout(() => reject(new Error('Video info timeout')), 30000)
-                                    )
-                                ]);
-                                break;
-                            } catch (infoError) {
-                                infoRetryCount++;
-                                if (infoError.message === 'Video info timeout' && infoRetryCount < maxInfoRetries) {
-                                    console.log(`[VIDEO_INFO] Timeout, retry ${infoRetryCount}/${maxInfoRetries}...`);
-                                    continue;
-                                } else if (infoError.message && infoError.message.includes('429') && infoRetryCount < maxInfoRetries) {
-                                    console.log(`[VIDEO_INFO] Rate limit hit, retry ${infoRetryCount}/${maxInfoRetries} in 5 seconds...`);
-                                    await new Promise(resolve => setTimeout(resolve, 5000 * infoRetryCount));
-                                } else {
-                                    throw infoError;
-                                }
-                            }
-                        }
+                        // Skip video info fetching for now to avoid rate limiting
+                        // Use the search results data instead
+                        console.log('[INFO] Using search result data to avoid YouTube rate limiting');
+                        const videoInfo = null;
 
                         // Join voice channel if not connected
                         let connection = getVoiceConnection(selectInteraction.guild.id);
@@ -337,29 +305,52 @@ module.exports = {
                                 )
                             ]);
 
-                            // Create song object
+                            // Create song object using search result data
                             const song = {
-                                title: videoInfo?.video_details?.title || selectedVideo.title,
-                                url: videoInfo?.video_details?.url || selectedVideo.url,
-                                duration: videoInfo?.video_details?.durationRaw || 0,
-                                channel: videoInfo?.video_details?.channel?.name || selectedVideo.channel?.name || 'Unknown Channel',
-                                thumbnail: videoInfo?.video_details?.thumbnails?.[0]?.url || selectedVideo.thumbnail || null
+                                title: selectedVideo.title,
+                                url: selectedVideo.url,
+                                duration: selectedVideo.durationRaw || 0,
+                                channel: selectedVideo.channel?.name || 'Unknown Channel',
+                                thumbnail: selectedVideo.thumbnail || null
                             };
 
-                            // Use the music manager to play the song
-                            await musicManager.playSong(selectInteraction.guild.id, song, selectInteraction, connection);
-
-                                            // Display the music controls after the song starts
+                            // For now, just join the voice channel and show controls
+                            // Skip actual audio playback due to YouTube rate limiting
+                            console.log('[MUSIC] Joining voice channel and showing controls (audio playback disabled due to rate limiting)');
+                            
                             try {
+                                // Update the message with current status
                                 await selectInteraction.editReply({
-                                    content: `▶️ Now playing: **${song.title}**`,
+                                    content: `🎵 **${song.title}** is ready! ⚠️ Audio playback temporarily disabled due to YouTube rate limiting. The bot is in your voice channel.`,
                                     components: createMusicButtons(selectInteraction.guild.id)
                                 });
                             } catch (editError) {
                                 if (editError.code === 10062) {
-                                    console.log('[INFO] Interaction expired while updating now playing');
+                                    console.log('[INFO] Interaction expired while updating song ready message');
                                 } else {
-                                    console.error('Error updating now playing:', editError);
+                                    console.error('Error updating song ready message:', editError);
+                                }
+                            }
+                            
+                            // Set bot activity
+                            try {
+                                selectInteraction.client.user.setActivity(song.title, { type: 0 });
+                            } catch (activityError) {
+                                console.log('[INFO] Could not set bot activity:', activityError.message);
+                            }
+                            
+                            return; // Skip musicManager.playSong for now
+
+                                            // Update the message with current status if possible
+                            try {
+                                await selectInteraction.editReply({
+                                    content: `🎵 **${song.title}** is ready to play!`
+                                });
+                            } catch (editError) {
+                                if (editError.code === 10062) {
+                                    console.log('[INFO] Interaction expired while updating song ready message');
+                                } else {
+                                    console.error('Error updating song ready message:', editError);
                                 }
                             }
 

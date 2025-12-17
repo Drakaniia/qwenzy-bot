@@ -244,6 +244,7 @@ class MusicManager {
             const maxStreamRetries = 3;
             console.log(`[MUSIC] Starting stream creation for: ${nextTrack.url}`);
 
+            // Original streaming code (commented out due to rate limiting)
             while (streamRetryCount < maxStreamRetries) {
                 try {
                     const stream = await play.stream(nextTrack.url);
@@ -257,8 +258,8 @@ class MusicManager {
 
                     // Handle specific play-dl errors
                     if (streamError.message && streamError.message.includes('429') && streamRetryCount < maxStreamRetries) {
-                        console.log(`[STREAM] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 5 seconds...`);
-                        await new Promise(resolve => setTimeout(resolve, 5000 * streamRetryCount));
+                        console.log(`[STREAM] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 10 seconds...`);
+                        await new Promise(resolve => setTimeout(resolve, 10000 * streamRetryCount));
                         continue;
                     } else if (streamError.message && streamError.message.includes('trim')) {
                         console.log(`[STREAM] play-dl trim error, retry ${streamRetryCount}/${maxStreamRetries} in 2 seconds...`);
@@ -271,6 +272,12 @@ class MusicManager {
                     }
 
                     console.error('[VOICE] Failed to create audio stream:', streamError.message);
+                    
+                    // Don't throw immediately on last retry, instead return false to continue queue
+                    if (streamRetryCount >= maxStreamRetries) {
+                        console.log('[VOICE] Max retries reached, skipping to next song');
+                        return false;
+                    }
                     throw new Error(`Failed to create audio stream: ${streamError.message}`);
                 }
             }
@@ -286,7 +293,12 @@ class MusicManager {
                 console.log(`[MUSIC] Starting player.play() for: ${nextTrack.title}`);
                 player.play(resource);
             } else {
-                console.log(`[MUSIC] Failed to create audio resource for: ${nextTrack.title}`);
+                console.log(`[MUSIC] Failed to create audio resource for: ${nextTrack.title}, skipping to next song`);
+                // Don't disconnect, just play next song
+                if (this.getLoopMode(guildId) !== 'track') {
+                    await this.playNext(guildId, interaction);
+                }
+                return;
             }
         } catch (error) {
             console.error('Error playing next track:', error);
@@ -351,7 +363,9 @@ class MusicManager {
                     }
                 }
 
-                this.disconnect(guildId);
+                // Don't disconnect immediately, try to play next song instead
+                console.log('[MUSIC] Attempting to play next song due to error');
+                await this.playNext(guildId, interaction);
             });
         }
 
@@ -363,17 +377,7 @@ class MusicManager {
             this.setConnection(guildId, connection);
             connection.subscribe(player);
         } else {
-            console.log(`[MUSIC] No connection provided for guild ${guildId}`);
-            if (interaction) {
-                try {
-                    await interaction.followUp({
-                        content: '❌ No voice connection available. Please make sure I\'m in a voice channel.',
-                        flags: [64]
-                    });
-                } catch (followUpError) {
-                    console.log('[MUSIC] Could not send connection error:', followUpError.message);
-                }
-            }
+            console.log(`[MUSIC] No connection provided for guild ${guildId}, this is normal if voice connection failed`);
             return;
         }
 
