@@ -212,6 +212,8 @@ client.on('interactionCreate', async interaction => {
         } catch (replyError) {
             if (replyError.code === 40060 || replyError.code === 10062) {
                 console.log('[INFO] Interaction already acknowledged or expired, skipping error reply');
+            } else if (replyError.code === 50006) {
+                console.log('[INFO] Cannot send empty message, skipping error reply');
             } else {
                 console.error('Failed to send error reply:', replyError);
             }

@@ -221,6 +221,7 @@ module.exports = {
 
                     console.log('[DEBUG] Passed all checks, starting playback...');
                     await selectInteraction.update({
+                        content: '▶️ Starting playback...',
                         components: [],
                         embeds: []
                     });
@@ -326,11 +327,19 @@ module.exports = {
                             // Use the music manager to play the song
                             await musicManager.playSong(selectInteraction.guild.id, song, selectInteraction, connection);
 
-                            // Display the music controls after the song starts
-                            await selectInteraction.editReply({
-                                content: `▶️ Now playing: **${song.title}**`,
-                                components: createMusicButtons(selectInteraction.guild.id)
-                            });
+                                            // Display the music controls after the song starts
+                            try {
+                                await selectInteraction.editReply({
+                                    content: `▶️ Now playing: **${song.title}**`,
+                                    components: createMusicButtons(selectInteraction.guild.id)
+                                });
+                            } catch (editError) {
+                                if (editError.code === 10062) {
+                                    console.log('[INFO] Interaction expired while updating now playing');
+                                } else {
+                                    console.error('Error updating now playing:', editError);
+                                }
+                            }
 
                         } catch (error) {
                             console.error('[VOICE] Connection timeout:', error);
