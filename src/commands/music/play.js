@@ -17,6 +17,13 @@ const play = require('play-dl');
 const rateLimiter = require('../../utils/rateLimiter');
 const musicManager = require('../../modules/musicManager'); // Import the music manager
 
+// Initialize play-dl with proper YouTube cookie/session if available
+if (process.env.YOUTUBE_COOKIE) {
+    play.setToken({
+        youtube: process.env.YOUTUBE_COOKIE
+    });
+}
+
 // Helper function to check if interaction is expired
 function isInteractionExpired(interaction) {
     const now = Date.now();
@@ -80,13 +87,20 @@ module.exports = {
                 try {
                     searchResults = await rateLimiter.execute(async () => {
                         console.log('[SEARCH] Attempting YouTube search with play-dl...');
-                        const results = await play.search(query, { 
-                            limit: 5, 
-                            source: { youtube: 'video' } 
+
+                        // Validate that play-dl search function exists
+                        if (typeof play.search !== 'function') {
+                            throw new Error('play-dl search function is not available');
+                        }
+
+                        const results = await play.search(query, {
+                            limit: 5,
+                            source: { youtube: 'video' },
+                            type: 'video'
                         });
-                        
+
                         console.log(`[SEARCH] Found ${results.length} results`);
-                        
+
                         return results.map(video => ({
                             title: video.title || 'Unknown Title',
                             url: video.url,
@@ -102,14 +116,30 @@ module.exports = {
                 } catch (searchError) {
                     retryCount++;
                     console.error(`[SEARCH] Search attempt ${retryCount} failed:`, searchError.message);
-                    
-                    if (searchError.message && searchError.message.includes('429') && retryCount < maxRetries) {
-                        console.log(`[SEARCH] Rate limit hit, retry ${retryCount}/${maxRetries} in 5 seconds...`);
+
+                    if (searchError.message && (searchError.message.includes('429') || searchError.message.includes('rate limit')) && retryCount < maxRetries) {
+                        console.log(`[SEARCH] Rate limit hit, retry ${retryCount}/${maxRetries} in ${5 * retryCount} seconds...`);
                         await new Promise(resolve => setTimeout(resolve, 5000 * retryCount)); // Exponential backoff
                     } else if (retryCount >= maxRetries) {
-                        throw new Error('Max search retries reached. Please try again later.');
+                        console.error('[SEARCH] Max search retries reached');
+                        await interaction.editReply({
+                            content: `❌ Failed to search for music after ${maxRetries} attempts. YouTube might be experiencing rate limits. Please try again later.`,
+                        });
+                        return;
+                    } else if (searchError.message && searchError.message.includes('play-dl search function is not available')) {
+                        console.error('[SEARCH] play-dl library issue detected');
+                        await interaction.editReply({
+                            content: `❌ Internal error: Music search library is not functioning properly. Please contact the bot administrator.`,
+                        });
+                        return;
                     } else {
-                        throw searchError;
+                        console.error('[SEARCH] Unexpected search error:', searchError);
+                        // For other errors, we continue to retry
+                        if (retryCount >= maxRetries) {
+                            throw searchError;
+                        }
+                        // Wait before retrying
+                        await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
                     }
                 }
             }
