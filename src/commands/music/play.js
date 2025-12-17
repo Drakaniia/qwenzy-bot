@@ -13,7 +13,7 @@ if (typeof File === 'undefined') {
 const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getVoiceConnection, joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
-const ytsr = require('ytsr');
+const play = require('play-dl');
 const rateLimiter = require('../../utils/rateLimiter');
 const musicManager = require('../../modules/musicManager'); // Import the music manager
 
@@ -79,32 +79,45 @@ module.exports = {
 
                 try {
                     searchResults = await rateLimiter.execute(async () => {
-                        const results = await ytsr.search(query, { limit: 5 });
-                        // Format the results to match the expected structure
-                        return results.items.filter(item => item.type === 'video').slice(0, 5).map(result => ({
-                            title: result.title,
-                            url: result.url,
-                            duration: result.duration,
-                            durationRaw: result.duration,
-                            durationFormatted: result.duration || 'N/A',
-                            channel: { name: result.author?.name || 'Unknown Channel' },
-                            thumbnail: result.bestThumbnail || result.thumbnails?.[0] || null
+                        console.log('[SEARCH] Attempting YouTube search with play-dl...');
+                        const results = await play.search(query, { 
+                            limit: 5, 
+                            source: { youtube: 'video' } 
+                        });
+                        
+                        console.log(`[SEARCH] Found ${results.length} results`);
+                        
+                        return results.map(video => ({
+                            title: video.title || 'Unknown Title',
+                            url: video.url,
+                            duration: video.durationInSec || 0,
+                            durationRaw: video.durationRaw || '0:00',
+                            durationFormatted: video.durationRaw || 'N/A',
+                            channel: { name: video.channel?.name || 'Unknown Channel' },
+                            thumbnail: video.thumbnails?.[0]?.url || null
                         }));
                     });
+                    console.log('[SEARCH] Search completed successfully');
                     break;
                 } catch (searchError) {
                     retryCount++;
+                    console.error(`[SEARCH] Search attempt ${retryCount} failed:`, searchError.message);
+                    
                     if (searchError.message && searchError.message.includes('429') && retryCount < maxRetries) {
                         console.log(`[SEARCH] Rate limit hit, retry ${retryCount}/${maxRetries} in 5 seconds...`);
                         await new Promise(resolve => setTimeout(resolve, 5000 * retryCount)); // Exponential backoff
+                    } else if (retryCount >= maxRetries) {
+                        throw new Error('Max search retries reached. Please try again later.');
                     } else {
                         throw searchError;
                     }
                 }
             }
 
-            if (searchResults.length === 0) {
-                return interaction.editReply({ content: 'No results found for your search!' });
+            if (!searchResults || searchResults.length === 0) {
+                return interaction.editReply({ 
+                    content: `❌ No results found for "${query}". Try a different search term.` 
+                });
             }
 
             const options = searchResults.map((video, index) => ({
