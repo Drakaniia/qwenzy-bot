@@ -16,6 +16,11 @@ Qweny is a feature-rich Discord bot built with Node.js and `discord.js`. It feat
 ## Fun Commands
 - **`/joke`** - Get a programming joke
 
+## 🛡️ Moderation Features
+- **Automatic welcome messages** - Sends custom welcome messages to new members in a designated channel
+  - Configure by updating `src/events/guildMemberAdd.js` with your desired welcome channel ID
+  - Customizable welcome message text
+
 ## Economy Commands
 - **`/balance`** - Check your current balance
 - **`/work`** - Earn money by working
