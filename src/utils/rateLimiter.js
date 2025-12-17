@@ -159,4 +159,9 @@ class RateLimiter {
 
 const rateLimiter = new RateLimiter();
 
-module.exports = rateLimiter;
+// Support test mode mocking
+if (typeof global !== 'undefined' && global.__TEST_MOCKS__ && global.__TEST_MOCKS__.rateLimiter) {
+    module.exports = global.__TEST_MOCKS__.rateLimiter;
+} else {
+    module.exports = rateLimiter;
+}

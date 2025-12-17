@@ -508,5 +508,11 @@ class MusicManager {
     }
 }
 
-// Export a singleton instance
-module.exports = new MusicManager();
+// Export a singleton instance with test mode support
+const musicManager = new MusicManager();
+
+if (typeof global !== 'undefined' && global.__TEST_MOCKS__ && global.__TEST_MOCKS__.musicManager) {
+    module.exports = global.__TEST_MOCKS__.musicManager;
+} else {
+    module.exports = musicManager;
+}
