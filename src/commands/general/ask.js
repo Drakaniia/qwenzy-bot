@@ -10,27 +10,66 @@ module.exports = {
                 .setDescription('The question you want to ask')
                 .setRequired(true)),
     async execute(interaction) {
-        let useEditReply = false;
+        let deferred = false;
         
+        // Step 1: Validate interaction and try to defer or reply
+        if (!interaction || !interaction.id) {
+            console.log('[ERROR] Invalid interaction object in ask command');
+            return;
+        }
+
+        // Check if interaction is still valid (not expired)
+        const now = Date.now();
+        const interactionTimestamp = interaction.createdTimestamp || now;
+        const maxAge = 15 * 60 * 1000; // 15 minutes
+        const isExpired = (now - interactionTimestamp) > maxAge;
+
+        if (isExpired) {
+            console.log('[INFO] Interaction expired in ask command, ignoring');
+            return;
+        }
+
         try {
             await interaction.deferReply();
-            useEditReply = true;
+            deferred = true;
         } catch (deferError) {
-            if (deferError.code !== 40060) {
+            if (deferError.code === 40060) {
+                // Interaction already acknowledged by another command/middleware
+                console.log('[INFO] Interaction already acknowledged, attempting to reply...');
+                // Check if we can detect this was already replied to
+                if (interaction.replied || interaction.deferred) {
+                    deferred = true;
+                } else {
+                    // Try immediate reply as fallback
+                    await interaction.reply('🧠 Processing your AI request...');
+                    deferred = true;
+                }
+            } else if (deferError.code === 10062) {
+                // Interaction expired or unknown
+                console.log('[INFO] Interaction expired (10062) in ask command, ignoring');
+                return;
+            } else {
+                // Different error, re-throw
                 throw deferError;
             }
-            console.log('[INFO] Interaction already deferred, continuing...');
-            useEditReply = true;
         }
         
         const prompt = interaction.options.getString('prompt');
 
         if (!process.env.GEMINI_API_KEY) {
-            if (useEditReply) {
-                return interaction.editReply('❌ My brain is missing! (GEMINI_API_KEY not found in .env)');
-            } else {
-                return interaction.reply('❌ My brain is missing! (GEMINI_API_KEY not found in .env)');
+            try {
+                await interaction.editReply('❌ My brain is missing! (GEMINI_API_KEY not found in .env)');
+            } catch (editError) {
+                if (editError.code === 40060) {
+                    await interaction.followUp({
+                        content: '❌ My brain is missing! (GEMINI_API_KEY not found in .env)',
+                        flags: [64]
+                    });
+                } else {
+                    throw editError;
+                }
             }
+            return;
         }
 
         try {
@@ -50,29 +89,54 @@ module.exports = {
 
             // Discord max length check
             if (response.length > 1900) {
-                if (useEditReply) {
+                try {
                     await interaction.editReply(response.substring(0, 1900) + '... (Output truncated)');
-                } else {
-                    await interaction.reply(response.substring(0, 1900) + '... (Output truncated)');
+                } catch (editError) {
+                    if (editError.code === 40060) {
+                        await interaction.followUp({
+                            content: response.substring(0, 1900) + '... (Output truncated)',
+                            flags: [64]
+                        });
+                    } else {
+                        throw editError;
+                    }
                 }
             } else {
-                if (useEditReply) {
+                try {
                     await interaction.editReply(response);
-                } else {
-                    await interaction.reply(response);
+                } catch (editError) {
+                    if (editError.code === 40060) {
+                        await interaction.followUp({
+                            content: response,
+                            flags: [64]
+                        });
+                    } else {
+                        throw editError;
+                    }
                 }
             }
 
         } catch (error) {
-            console.error(error);
+            console.error('Ask command error:', error);
+            
+            // Don't try to send error if interaction is expired
+            const now = Date.now();
+            const interactionAge = now - (interaction.createdTimestamp || now);
+            const isExpired = interactionAge > (15 * 60 * 1000); // 15 minutes
+            
+            if (isExpired) {
+                console.log('[INFO] Interaction expired in ask command, not sending error message');
+                return;
+            }
+            
             try {
-                if (useEditReply) {
-                    await interaction.editReply('🤯 Brain freeze! (Error connecting to AI)');
-                } else {
-                    await interaction.reply('🤯 Brain freeze! (Error connecting to AI)');
-                }
+                await interaction.editReply('🤯 Brain freeze! (Error connecting to AI)');
             } catch (replyError) {
-                console.log('[INFO] Interaction already acknowledged, skipping error reply');
+                if (replyError.code === 40060 || replyError.code === 10062) {
+                    console.log('[INFO] Interaction expired or already acknowledged, cannot send error message');
+                } else {
+                    console.error('Failed to send error message:', replyError);
+                }
             }
         }
     },
