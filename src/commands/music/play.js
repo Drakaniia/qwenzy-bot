@@ -4,6 +4,13 @@ const play = require('play-dl');
 const rateLimiter = require('../../utils/rateLimiter');
 const musicManager = require('../../modules/musicManager'); // Import the music manager
 
+// Helper function to check if interaction is expired
+function isInteractionExpired(interaction) {
+    const now = Date.now();
+    const interactionAge = now - (interaction.createdTimestamp || now);
+    return interactionAge > (14 * 60 * 1000); // 14 minutes buffer
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('play')
@@ -16,6 +23,16 @@ module.exports = {
         const query = interaction.options.getString('query');
 
         try {
+            // Check if interaction is expired before starting
+            const now = Date.now();
+            const interactionAge = now - (interaction.createdTimestamp || now);
+            const isExpired = interactionAge > (14 * 60 * 1000); // 14 minutes (give 1 minute buffer)
+            
+            if (isExpired) {
+                console.log('[INFO] Interaction expired before starting search');
+                return;
+            }
+
             // Handle Railway environment interaction timing
             let replied = false;
             try {
@@ -26,6 +43,9 @@ module.exports = {
                     console.log('[INFO] Interaction already acknowledged, using editReply');
                     await interaction.editReply({ content: '🔍 Searching...', flags: [] });
                     replied = true;
+                } else if (replyError.code === 10062) {
+                    console.log('[INFO] Interaction expired, cannot respond');
+                    return;
                 } else {
                     throw replyError;
                 }
@@ -37,6 +57,13 @@ module.exports = {
             const maxRetries = 3;
 
             while (retryCount < maxRetries) {
+                // Check interaction timeout before each search attempt
+                const currentAge = Date.now() - (interaction.createdTimestamp || Date.now());
+                if (currentAge > (14 * 60 * 1000)) {
+                    console.log('[INFO] Interaction expired during search retries');
+                    return;
+                }
+
                 try {
                     searchResults = await rateLimiter.execute(async () => {
                         return await play.search(query, { limit: 5 });
@@ -71,6 +98,13 @@ module.exports = {
                         .addOptions(options)
                 );
 
+            // Check interaction timeout before sending search results
+            const currentAge = Date.now() - (interaction.createdTimestamp || Date.now());
+            if (currentAge > (14 * 60 * 1000)) {
+                console.log('[INFO] Interaction expired before sending search results');
+                return;
+            }
+
             const embed = {
                 title: '🔍 Search Results',
                 description: `Found ${searchResults.length} results for "${query}"`,
@@ -78,11 +112,20 @@ module.exports = {
                 timestamp: new Date().toISOString(),
             };
 
-            await interaction.editReply({
-                content: '',
-                embeds: [embed],
-                components: [row]
-            });
+            try {
+                await interaction.editReply({
+                    content: '',
+                    embeds: [embed],
+                    components: [row]
+                });
+            } catch (editError) {
+                if (editError.code === 10062) {
+                    console.log('[INFO] Interaction expired while sending search results');
+                    return;
+                } else {
+                    throw editError;
+                }
+            }
 
             const collector = interaction.channel.createMessageComponentCollector({
                 componentType: ComponentType.StringSelect,
@@ -92,6 +135,10 @@ module.exports = {
             collector.on('end', (collected, reason) => {
                 if (reason === 'time') {
                     console.log('[DEBUG] Collector timed out');
+                    if (isInteractionExpired(interaction)) {
+                        console.log('[INFO] Interaction expired, skipping timeout message');
+                        return;
+                    }
                     try {
                         interaction.editReply({
                             components: [],
@@ -330,6 +377,10 @@ module.exports = {
 
             collector.on('end', (collected, reason) => {
                 if (reason === 'time') {
+                    if (isInteractionExpired(interaction)) {
+                        console.log('[INFO] Interaction expired, skipping timeout message');
+                        return;
+                    }
                     try {
                         interaction.editReply({
                             components: [],
