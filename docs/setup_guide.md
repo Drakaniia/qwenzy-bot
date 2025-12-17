@@ -1,84 +1,165 @@
-# Qweny Bot Setup Guide 📜
+# Qweny Bot Setup Guide
 
-This document chronicles the journey of building **Qweny Bot**, a Discord bot with a sarcastic programming personality.
+This document provides detailed instructions for setting up and configuring the Qweny Discord bot.
 
-## 1. Project Initialization
-We started by creating a blank Node.js project.
+## Table of Contents
+- [Prerequisites](#prerequisites)
+- [Local Setup](#local-setup)
+- [Environment Variables](#environment-variables)
+- [Deployment Options](#deployment-options)
+- [Configuration](#configuration)
+
+## Prerequisites
+
+- Node.js 18 or higher
+- Discord Bot Token
+- Google Gemini API Key or Groq API Key (optional, for AI features)
+
+## Local Setup
+
+### 1. Clone the Repository
 ```bash
-npm init -y
-npm install discord.js dotenv
+git clone https://github.com/Drakaniia/qwenzy-bot.git
+cd qwenzy-bot
 ```
 
-## 2. The Foundation (`index.js`)
-We built the main entry point to:
-- Connect to Discord using the `Client` class.
-- Load the **Bot Token** securely from a `.env` file.
-- Handle the `ready` event to let us know when Qweny is online.
-- We added a "Programming Humor" personality (e.g., status: "Debugging my own life code").
-
-## 3. Slash Commands (`deploy-commands.js`)
-We moved away from legacy `!ping` commands to modern Slash Commands (`/ping`).
-- We created a script `deploy-commands.js` to register commands with Discord's API.
-- We used `Routes.applicationGuildCommands` for instant updates during development (instead of global commands which can take an hour).
-
-## 4. The Brain (`/ask`)
-We integrated Google's **Gemini AI** to give Qweny a brain.
-- Installed `@google/generative-ai`.
-- Created an `/ask` command that takes a user prompt, sends it to Gemini, and replies with a response in Qweny's sarcastic style.
-
-## 5. Docker Support 🐳
-Qweny Bot can be deployed using Docker for containerized deployment.
-
-### Building the Docker Image
+### 2. Install Dependencies
 ```bash
-# Build the Docker image
-docker build -t qwenzy-bot .
-
-# Build with production dependencies only
-docker build --target production -t qwenzy-bot .
+npm install
 ```
 
-### Running the Bot with Docker
+### 3. Create Environment Variables
+Create a `.env` file in the root directory:
+```env
+DISCORD_TOKEN=your_discord_bot_token
+CLIENT_ID=your_discord_application_client_id
+GUILD_ID=your_discord_server_id
+LAVALINK_HOST=localhost
+LAVALINK_PORT=2333
+LAVALINK_PASSWORD=youshallnotpass
+LAVALINK_SECURE=false
+LAVALINK_SEARCH_PREFIX=ytsearch
+GEMINI_API_KEY=your_google_gemini_api_key
+BOT_AVATAR_URL=your_bot_avatar_image_url
+```
+
+### 4. Run the Bot
 ```bash
-# Run the bot container (requires .env file in the current directory)
-docker run -d --name qwenzy-bot --env-file .env -p 3000:3000 qwenzy-bot
-
-# Run with custom environment variables
-docker run -d --name qwenzy-bot -e DISCORD_TOKEN=your_token -e GEMINI_API_KEY=your_key -e CLIENT_ID=your_client_id -e GUILD_ID=your_guild_id -e PORT=3000 -p 3000:3000 qwenzy-bot
-
-# If environment variables are not set, the bot starts a health check server only
-docker run -d --name qwenzy-bot -p 3000:3000 qwenzy-bot
+npm start
 ```
 
-### Running with Docker Compose
-```bash
-docker-compose up -d
-```
+## Environment Variables
 
-### Docker Container Health Check
-If the bot starts without required environment variables (DISCORD_TOKEN or CLIENT_ID), it will run a health check server instead of connecting to Discord:
-- Root endpoint: http://localhost:3000
-- Health endpoint: http://localhost:3000/health
+### Required
+- `DISCORD_TOKEN` - Your Discord bot token from the Discord Developer Portal
+- `CLIENT_ID` - Your Discord application client ID
 
-> Note: The bot uses the PORT environment variable to determine which port to run on. By default, the Dockerfile exposes port 3000, which is the default value if PORT is not specified in your .env file.
+### Optional but Recommended
+- `GUILD_ID` - Your Discord server ID for faster command deployment
+- `GEMINI_API_KEY` - Google Generative AI API key for AI chat features (optional)
+- `GROQ_API_KEY` - Groq API key for AI chat features (alternative to Gemini, optional)
+- `BOT_AVATAR_URL` - URL for bot avatar image
 
-## 6. Directory Structure
-```
-qweny-bot/
-├── index.js              # Main bot file
-├── deploy-commands.js    # Script to register commands
-├── Dockerfile            # Docker configuration
-├── .env                  # Secrets (Token, App ID, API Keys)
-├── src/
-│   ├── commands/
-│   │   ├── general/      # ping.js, ask.js
-│   │   ├── moderation/   # kick.js
-│   │   ├── economy/      # balance.js, work.js
-│   │   └── fun/          # joke.js
-```
+### Lavalink (Music Playback)
+- `LAVALINK_HOST` - Hostname of your Lavalink server (default: localhost)
+- `LAVALINK_PORT` - Port of your Lavalink server (default: 2333)
+- `LAVALINK_PASSWORD` - Password of your Lavalink server (default: youshallnotpass)
+- `LAVALINK_SECURE` - Whether to use SSL/TLS for Lavalink connection (default: false)
+- `LAVALINK_SEARCH_PREFIX` - Search prefix used by Lavalink (default: ytsearch)
+
+## Deployment Options
+
+### Render (Recommended Setup)
+
+#### Step 1: Deploy Lavalink Service
+1. Create a new **Web Service** on Render
+2. Select "Docker" as the environment
+3. Connect your GitHub repository
+4. **Dockerfile Path**: `lavalink.Dockerfile`
+5. **Service Name**: `qwenzy-lavalink` (or your preferred name)
+6. Set environment variables:
+   - `PORT=2333`
+7. Note the internal service URL (e.g., `qwenzy-lavalink:2333`)
+
+#### Step 2: Deploy Bot Service
+1. Create another new **Web Service** on Render
+2. Connect your GitHub repository
+3. **Build Command**: `npm install`
+4. **Start Command**: `npm start`
+5. Add environment variables:
+   - `DISCORD_TOKEN=your_discord_bot_token`
+   - `CLIENT_ID=your_discord_application_client_id`
+   - `GUILD_ID=your_discord_server_id`
+   - `LAVALINK_HOST=qwenzy-lavalink` (use your Lavalink service name)
+   - `LAVALINK_PORT=2333`
+   - `LAVALINK_PASSWORD=youshallnotpass`
+   - `LAVALINK_SECURE=false`
+   - `LAVALINK_SEARCH_PREFIX=ytsearch`
+   - `GEMINI_API_KEY=your_google_gemini_api_key` (optional)
+   - `GROQ_API_KEY=your_groq_api_key` (alternative to Gemini, optional)
+
+**Important**: Both services must be in the same Render project to communicate via internal URLs.
+
+### Railway
+1. Create a new project on Railway
+2. Connect your GitHub repository
+3. Set the build command: `npm install`
+4. Set the start command: `npm start`
+5. Add all required environment variables
+
+### Docker
+1. Build the Docker image:
+   ```bash
+   docker build -t qwenzy-bot .
+   ```
+2. Run the container with your environment variables:
+   ```bash
+   docker run -d --env-file .env --name qwenzy-bot qwenzy-bot
+   ```
+
+### Docker Compose
+1. Create a `docker-compose.yml` file with your environment variables
+2. Run the bot:
+   ```bash
+   docker-compose up -d
+   ```
+
+## Configuration
+
+### Discord Bot Permissions
+Make sure your bot has these permissions:
+- View Channels
+- Send Messages
+- Embed Links
+- Attach Files
+- Read Message History
+- Connect (for voice channels)
+- Speak (for voice channels)
+- Use Voice Activity
+
+### Discord Intents
+The bot requires these Discord intents:
+- `Guilds`
+- `GuildMessages`
+- `MessageContent`
+- `GuildVoiceStates`
+
+### Debug Mode
+Enable debug logging by setting `DEBUG=true` in your environment variables.
 
 ## Troubleshooting
-- **Command not showing?** Ensure `deploy-commands.js` was run and the `GUILD_ID` in `.env` is correct.
-- **AI Error?** Check if `GEMINI_API_KEY` is valid in `.env`.
-- **Docker build fails?** Make sure you have Docker installed and the Docker daemon is running.
-- **Docker container exits immediately?** Verify that your `.env` file contains all required environment variables.
+
+### Common Issues
+- **Commands not registering**: Ensure you've run `node deploy-commands.js`
+- **"No nodes are available" error**: 
+  - Check that your Lavalink service is running
+  - Verify `LAVALINK_HOST` points to the correct service (use service name for Render, `localhost` for local)
+  - Ensure both bot and Lavalink services are in the same Render project
+  - Check Lavalink logs for connection errors
+- **Music not playing**: 
+  - Verify bot has voice permissions in the channel
+  - Ensure you're in a voice channel when using music commands
+  - Check Lavalink service status and logs
+- **AI responses not working**: Verify your `GEMINI_API_KEY` or `GROQ_API_KEY` is valid
+- **Bot disconnecting**: Check internet connection and Discord API status
+- **"Unknown interaction" errors**: These are typically caused by timeouts and are now properly handled
