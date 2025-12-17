@@ -16,8 +16,20 @@ module.exports = {
         const query = interaction.options.getString('query');
 
         try {
-            // Reply immediately to show the bot is working
-            await interaction.reply({ content: '🔍 Searching...', flags: [] });
+            // Handle Railway environment interaction timing
+            let replied = false;
+            try {
+                await interaction.reply({ content: '🔍 Searching...', flags: [] });
+                replied = true;
+            } catch (replyError) {
+                if (replyError.code === 40060) {
+                    console.log('[INFO] Interaction already acknowledged, using editReply');
+                    await interaction.editReply({ content: '🔍 Searching...', flags: [] });
+                    replied = true;
+                } else {
+                    throw replyError;
+                }
+            }
 
             // Use global rate limiter for search with retry logic
             let searchResults;

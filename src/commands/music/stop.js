@@ -23,7 +23,19 @@ module.exports = {
             await interaction.reply('🛑 Stopped the music and left the voice channel!');
         } catch (error) {
             console.error('Stop command error:', error);
-            interaction.reply({ content: 'An error occurred while trying to stop the music.', flags: [64] });
+            try {
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp({ content: 'An error occurred while trying to stop the music.', flags: [64] });
+                } else {
+                    await interaction.reply({ content: 'An error occurred while trying to stop the music.', flags: [64] });
+                }
+            } catch (replyError) {
+                if (replyError.code === 40060 || replyError.code === 10062) {
+                    console.log('[INFO] Interaction already acknowledged, cannot send error');
+                } else {
+                    console.error('Failed to send error message:', replyError);
+                }
+            }
         }
     },
 };

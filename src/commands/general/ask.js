@@ -10,11 +10,27 @@ module.exports = {
                 .setDescription('The question you want to ask')
                 .setRequired(true)),
     async execute(interaction) {
-        await interaction.deferReply();
+        let useEditReply = false;
+        
+        try {
+            await interaction.deferReply();
+            useEditReply = true;
+        } catch (deferError) {
+            if (deferError.code !== 40060) {
+                throw deferError;
+            }
+            console.log('[INFO] Interaction already deferred, continuing...');
+            useEditReply = true;
+        }
+        
         const prompt = interaction.options.getString('prompt');
 
         if (!process.env.GEMINI_API_KEY) {
-            return interaction.editReply('❌ My brain is missing! (GEMINI_API_KEY not found in .env)');
+            if (useEditReply) {
+                return interaction.editReply('❌ My brain is missing! (GEMINI_API_KEY not found in .env)');
+            } else {
+                return interaction.reply('❌ My brain is missing! (GEMINI_API_KEY not found in .env)');
+            }
         }
 
         try {
@@ -34,14 +50,30 @@ module.exports = {
 
             // Discord max length check
             if (response.length > 1900) {
-                await interaction.editReply(response.substring(0, 1900) + '... (Output truncated)');
+                if (useEditReply) {
+                    await interaction.editReply(response.substring(0, 1900) + '... (Output truncated)');
+                } else {
+                    await interaction.reply(response.substring(0, 1900) + '... (Output truncated)');
+                }
             } else {
-                await interaction.editReply(response);
+                if (useEditReply) {
+                    await interaction.editReply(response);
+                } else {
+                    await interaction.reply(response);
+                }
             }
 
         } catch (error) {
             console.error(error);
-            await interaction.editReply('🤯 Brain freeze! (Error connecting to AI)');
+            try {
+                if (useEditReply) {
+                    await interaction.editReply('🤯 Brain freeze! (Error connecting to AI)');
+                } else {
+                    await interaction.reply('🤯 Brain freeze! (Error connecting to AI)');
+                }
+            } catch (replyError) {
+                console.log('[INFO] Interaction already acknowledged, skipping error reply');
+            }
         }
     },
 };
