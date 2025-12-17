@@ -1,5 +1,6 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
+const proxyquire = require('proxyquire').noCallThru();
 
 describe('Discord Music Play Command Core Tests', () => {
     let playCommand, interaction, stubs;
@@ -7,7 +8,7 @@ describe('Discord Music Play Command Core Tests', () => {
     beforeEach(() => {
         // Mock environment
         process.env.YOUTUBE_COOKIE = undefined;
-        
+
         // Create basic mocks first
         const mockSearchResults = [{
             title: 'Test Song',
@@ -50,52 +51,36 @@ describe('Discord Music Play Command Core Tests', () => {
             }
         };
 
-        // Override require cache
-        const originalRequire = require;
-        require = function(id) {
-            if (id.includes('play-dl')) {
-                return {
-                    search: stubs.playSearch,
-                    video_info: stubs.playVideoInfo,
-                    setToken: sinon.stub()
-                };
+        // Import the play command with proxyquire
+        playCommand = proxyquire('../src/commands/music/play', {
+            'play-dl': {
+                search: stubs.playSearch,
+                video_info: stubs.playVideoInfo,
+                setToken: sinon.stub()
+            },
+            'ytdl-core': {
+                getInfo: stubs.ytdlGetInfo
+            },
+            '@discordjs/voice': {
+                getVoiceConnection: stubs.voiceGetConnection,
+                joinVoiceChannel: stubs.voiceJoinChannel,
+                entersState: stubs.voiceEntersState,
+                VoiceConnectionStatus: {
+                    Signalling: 'signalling',
+                    Connecting: 'connecting',
+                    Ready: 'ready',
+                    Disconnected: 'disconnected'
+                }
+            },
+            '../../utils/rateLimiter': {
+                execute: stubs.rateLimiterExecute
+            },
+            '../../modules/musicManager': {
+                playSong: stubs.musicManagerPlaySong
             }
-            if (id.includes('ytdl-core')) {
-                return {
-                    getInfo: stubs.ytdlGetInfo
-                };
-            }
-            if (id.includes('@discordjs/voice')) {
-                return {
-                    getVoiceConnection: stubs.voiceGetConnection,
-                    joinVoiceChannel: stubs.voiceJoinChannel,
-                    entersState: stubs.voiceEntersState,
-                    VoiceConnectionStatus: {
-                        Signalling: 'signalling',
-                        Connecting: 'connecting',
-                        Ready: 'ready',
-                        Disconnected: 'disconnected'
-                    }
-                };
-            }
-            if (id.includes('rateLimiter')) {
-                return {
-                    execute: stubs.rateLimiterExecute
-                };
-            }
-            if (id.includes('musicManager')) {
-                return {
-                    playSong: stubs.musicManagerPlaySong
-                };
-            }
-            return originalRequire.apply(this, arguments);
-        };
+        });
 
-        // Clear and import the play command
-        delete require.cache[require.resolve('../src/commands/music/play')];
-        playCommand = require('../src/commands/music/play');
-
-        // Create mock interaction
+        // Create mock interaction (rest of the setup)
         interaction = {
             member: {
                 voice: {
@@ -131,7 +116,7 @@ describe('Discord Music Play Command Core Tests', () => {
             reply: sinon.stub().resolves(),
             editReply: sinon.stub().resolves(),
             followUp: sinon.stub().resolves(),
-            user: { 
+            user: {
                 id: 'user-123',
                 tag: 'testuser#1234'
             },
@@ -143,9 +128,6 @@ describe('Discord Music Play Command Core Tests', () => {
     afterEach(() => {
         // Clean up global test mocks
         delete global.__TEST_MOCKS__;
-        // Restore original require
-        require = module.constructor.prototype.require;
-        delete require.cache[require.resolve('../src/commands/music/play')];
         sinon.restore();
     });
 
@@ -197,7 +179,7 @@ describe('Discord Music Play Command Core Tests', () => {
             interaction.editReply.resolves();
 
             stubs.rateLimiterExecute.resolves([]);
-            
+
             // Mock the collector to prevent hanging
             interaction.channel.createMessageComponentCollector = () => ({
                 on: sinon.stub(),
@@ -244,7 +226,7 @@ describe('Discord Music Play Command Core Tests', () => {
 
         it('should handle empty search results', async () => {
             stubs.rateLimiterExecute.resolves([]);
-            
+
             // Mock the collector to prevent hanging
             interaction.channel.createMessageComponentCollector = () => ({
                 on: sinon.stub(),
@@ -272,7 +254,7 @@ describe('Discord Music Play Command Core Tests', () => {
         it('should check bot permissions structure', async () => {
             const voiceChannel = interaction.member.voice.channel;
             const permissions = voiceChannel.permissionsFor();
-            
+
             expect(permissions).to.be.an('object');
             expect(typeof permissions.has).to.equal('function');
         });
@@ -330,7 +312,7 @@ describe('Discord Music Play Command Core Tests', () => {
             const now = Date.now();
             const interactionAge = now - (interaction.createdTimestamp || now);
             const isExpired = interactionAge > (14 * 60 * 1000); // 14 minutes
-            
+
             expect(isExpired).to.be.false; // Fresh interaction
         });
 
@@ -338,14 +320,14 @@ describe('Discord Music Play Command Core Tests', () => {
             const oldTimestamp = Date.now() - (15 * 60 * 1000); // 15 minutes ago
             const interactionAge = Date.now() - oldTimestamp;
             const isExpired = interactionAge > (14 * 60 * 1000);
-            
+
             expect(isExpired).to.be.true; // Expired interaction
         });
 
         it('should handle Discord API error codes', () => {
             const alreadyAcknowledgedError = { code: 40060 };
             const interactionExpiredError = { code: 10062 };
-            
+
             expect(alreadyAcknowledgedError.code).to.equal(40060);
             expect(interactionExpiredError.code).to.equal(10062);
         });
@@ -388,7 +370,7 @@ describe('Discord Music Play Command Core Tests', () => {
 
             try {
                 await playCommand.execute(interaction);
-                
+
                 // Simulate user selection
                 if (collectorCallback) {
                     const mockSelectInteraction = {
