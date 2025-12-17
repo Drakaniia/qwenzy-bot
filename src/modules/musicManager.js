@@ -1,3 +1,15 @@
+// Polyfill for File object if not available (needed for undici compatibility)
+if (typeof File === 'undefined') {
+    global.File = class File extends Blob {
+        constructor(fileBits, fileName, options = {}) {
+            super(fileBits, options);
+            this.lastModified = options.lastModified || Date.now();
+            this.name = fileName.replace(/\.[^/.]+$/, ""); // Remove extension for name
+            this.webkitRelativePath = options.webkitRelativePath || "";
+        }
+    };
+}
+
 const { createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus, demuxProbe } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const rateLimiter = require('../utils/rateLimiter');
