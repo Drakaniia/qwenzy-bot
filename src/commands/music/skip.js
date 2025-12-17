@@ -1,5 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getVoiceConnection } = require('@discordjs/voice');
 const musicManager = require('../../modules/musicManager');
 
 module.exports = {
@@ -18,7 +17,7 @@ module.exports = {
         }
 
         try {
-            const skipped = musicManager.skip(interaction.guild.id, interaction);
+            const skipped = await musicManager.skip(interaction.guild.id);
             if (skipped) {
                 await interaction.reply('⏭️ Skipped to the next track!');
             } else {

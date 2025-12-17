@@ -1,5 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getVoiceConnection, AudioPlayerStatus } = require('@discordjs/voice');
 const musicManager = require('../../modules/musicManager');
 
 module.exports = {
@@ -18,15 +17,13 @@ module.exports = {
         }
 
         try {
-            // Check if player is already paused
-            if (player.state.status === AudioPlayerStatus.Paused) {
+            if (player.paused) {
                 return interaction.reply({ content: 'Music is already paused!', flags: [64] });
             }
 
-            // Pause the player using music manager
             const paused = musicManager.pause(interaction.guild.id);
             if (paused) {
-                await interaction.reply(`⏸️ Paused: **${musicManager.getCurrentTrack(interaction.guild.id)?.title || 'Unknown Track'}**`);
+                await interaction.reply(`⏸️ Paused: **${musicManager.getCurrentTrack(interaction.guild.id)?.info?.title || 'Unknown Track'}**`);
             } else {
                 return interaction.reply({ content: 'Could not pause the music!', flags: [64] });
             }

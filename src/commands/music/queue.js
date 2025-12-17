@@ -13,15 +13,14 @@ module.exports = {
             return interaction.reply({ content: '❌ The queue is empty!', flags: [64] });
         }
         
-        let queueText = `🎵 Now Playing: **${currentTrack?.title || 'Nothing'}**\n`;
+        let queueText = `🎵 Now Playing: **${currentTrack?.info?.title || 'Nothing'}**\n`;
         
         if (queue.length > 0) {
             queueText += `\n📋 Queue (${queue.length} songs):\n`;
             
-            // Show first 10 songs in queue
             for (let i = 0; i < Math.min(queue.length, 10); i++) {
                 const song = queue[i];
-                queueText += `${i + 1}. **${song.title}**\n`;
+                queueText += `${i + 1}. **${song.info?.title || song.title}**\n`;
             }
             
             if (queue.length > 10) {
