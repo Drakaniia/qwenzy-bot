@@ -173,13 +173,11 @@ module.exports = {
                         return;
                     }
 
-                    console.log('[DEBUG] Passed all checks, updating message...');
+                    console.log('[DEBUG] Passed all checks, starting playback...');
                     await selectInteraction.update({
-                        content: `🔌 Connecting to voice channel... 🎵 **${selectedVideo.title}**`,
                         components: [],
                         embeds: []
                     });
-                    console.log('[DEBUG] Message updated, starting playback...');
 
                     try {
                         // Get video info with retry logic
@@ -268,10 +266,6 @@ module.exports = {
 
                         // Wait for connection to be ready before playing
                         try {
-                            await selectInteraction.editReply({
-                                content: `🔊 Establishing voice connection... 🎵 **${selectedVideo.title}**`
-                            });
-
                             await entersState(connection, VoiceConnectionStatus.Ready, 15000);
 
                             // Create song object
