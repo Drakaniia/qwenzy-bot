@@ -1,5 +1,15 @@
 require('dotenv').config();
 
+// Prevent the process from crashing on unhandled promise rejections / exceptions.
+// (Common with voice + streaming libs when requests fail or events emit async handlers.)
+process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught exception:', err);
+});
+
 // Polyfill for File object if not available (needed for undici compatibility)
 if (typeof File === 'undefined') {
     global.File = class File extends Blob {
@@ -13,13 +23,12 @@ if (typeof File === 'undefined') {
 }
 
 // Validate dependencies on startup
+// Lavalink playback runs remotely, so we do not require native voice deps (opus/ffmpeg).
 function validateDependencies() {
     try {
         require('discord.js');
-        require('@discordjs/voice');
-        require('play-dl');
-        require('ffmpeg-static');
-        console.log('[INIT] ✅ All required dependencies are available');
+        require('riffy');
+        console.log('[INIT] ✅ Core dependencies are available');
     } catch (error) {
         console.error('[INIT] ❌ Missing required dependencies:', error.message);
         console.error('[DEBUG] Error details:', error);
@@ -27,43 +36,11 @@ function validateDependencies() {
     }
 }
 
-// Validate voice dependencies specifically
-function validateVoiceDependencies() {
-    try {
-        // Test if we can load required voice stack components
-        require('@discordjs/voice');
-        require('play-dl');
-
-        const ffmpegPath = require('ffmpeg-static');
-        console.log('[VOICE] ✅ play-dl and ffmpeg-static are available');
-        console.log('[VOICE] FFmpeg path:', ffmpegPath);
-
-        // Opus encoder is required for audio playback (native module; can fail to install on Windows)
-        try {
-            require('@discordjs/opus');
-            console.log('[VOICE] ✅ @discordjs/opus is available (Opus encoder)');
-        } catch (opusError) {
-            console.error('[VOICE] ❌ @discordjs/opus is NOT available:', opusError.message);
-            console.error('[VOICE] Audio playback will not work until an Opus encoder is installed.');
-        }
-
-        // Sodium is strongly recommended for voice encryption performance/stability
-        try {
-            require('libsodium-wrappers');
-            console.log('[VOICE] ✅ libsodium-wrappers is available');
-        } catch (sodiumError) {
-            console.warn('[VOICE] ⚠️ libsodium-wrappers not available:', sodiumError.message);
-        }
-    } catch (error) {
-        console.error('[VOICE] ❌ Voice dependency validation failed:', error.message);
-        console.log('[VOICE] Voice commands may not work properly!');
-    }
-}
-
 validateDependencies();
-validateVoiceDependencies();
 
-const { Client, Collection, GatewayIntentBits, Events } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Events, GatewayDispatchEvents } = require('discord.js');
+const { Riffy } = require('riffy');
+const musicManager = require('./src/modules/musicManager');
 const fs = require('fs');
 const path = require('path');
 
@@ -113,6 +90,34 @@ const client = new Client({
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMembers // Added for member join events
     ]
+});
+
+// Lavalink (Riffy) setup
+const lavalinkNodes = [
+    {
+        host: process.env.LAVALINK_HOST || 'localhost',
+        port: Number(process.env.LAVALINK_PORT || 2333),
+        password: process.env.LAVALINK_PASSWORD || 'youshallnotpass',
+        secure: String(process.env.LAVALINK_SECURE || 'false').toLowerCase() === 'true',
+    }
+];
+
+client.riffy = new Riffy(
+    client,
+    lavalinkNodes,
+    {
+        send: (payload) => {
+            const guild = client.guilds.cache.get(payload.d.guild_id);
+            if (guild) guild.shard.send(payload);
+        },
+        defaultSearchPlatform: process.env.LAVALINK_SEARCH_PREFIX || 'ytsearch',
+        restVersion: 'v4',
+    }
+);
+
+client.on('raw', (d) => {
+    if (![GatewayDispatchEvents.VoiceStateUpdate, GatewayDispatchEvents.VoiceServerUpdate].includes(d.t)) return;
+    client.riffy.updateVoiceState(d);
 });
 
 client.commands = new Collection();
@@ -174,25 +179,19 @@ client.once(Events.ClientReady, async () => {
     console.log(`[INIT] Logged in as ${client.user.tag}!`);
     console.log(`[INFO] Ready to compile some fun.`);
 
+    // Init Lavalink client
+    try {
+        client.riffy.init(client.user.id);
+        musicManager.init(client);
+        console.log('[LAVALINK] ✅ Riffy initialized');
+    } catch (e) {
+        console.error('[LAVALINK] ❌ Failed to init Riffy:', e);
+    }
+
     if (process.env.GEMINI_API_KEY) {
         console.log('[INFO] 🧠 Gemini AI Key loaded successfully.');
     } else {
         console.log('[WARN] ⚠️ Gemini AI Key is MISSING in process.env!');
-    }
-
-    // Validate voice dependencies
-    try {
-        const { generateDependencyReport } = require('@discordjs/voice');
-        const ffmpeg = require('ffmpeg-static');
-
-        console.log('[INFO] 🎵 Voice dependencies validated successfully.');
-        console.log('[INFO] 📦 FFmpeg path:', ffmpeg);
-
-        // Optional: Log dependency report for debugging
-        // console.log(generateDependencyReport());
-    } catch (error) {
-        console.error('[ERROR] ❌ Voice dependency validation failed:', error.message);
-        console.error('[ERROR] Voice commands may not work properly!');
     }
 
     // Set bot avatar if BOT_AVATAR_URL is provided
