@@ -100,6 +100,13 @@ npm start
 
 **Important**: Both services must be in the same Render project to communicate via internal URLs.
 
+#### Step 3: Keep Your Bot Online 24/7
+Render free tier services may sleep after 15 minutes of inactivity. To keep your bot running 24/7:
+1. Set up an uptime monitoring service (like UptimeRobot, StatusCake, or similar)
+2. Configure the monitor to ping your bot's health check endpoint every 5 minutes
+3. The health check endpoint is: `https://your-bot-name.onrender.com/health`
+4. This prevents the Render service from sleeping, ensuring your bot stays online
+
 ### Railway
 1. Create a new project on Railway
 2. Connect your GitHub repository
