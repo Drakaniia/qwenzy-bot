@@ -145,13 +145,16 @@ class MusicManager {
             const maxStreamRetries = 3;
 
             while (streamRetryCount < maxStreamRetries) {
+                // Add delay to reduce chance of rate limiting
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
                 try {
                     // Add timeout protection for streaming
                     const streamPromise = play.stream(previousTrack.url, {
                         quality: 2 // highest quality audio
                     });
 
-                    const timeoutPromise = new Promise((_, reject) => 
+                    const timeoutPromise = new Promise((_, reject) =>
                         setTimeout(() => reject(new Error('Stream timeout - YouTube is taking too long to respond')), 10000)
                     );
 
@@ -175,7 +178,7 @@ class MusicManager {
                     }
 
                     console.error('[VOICE] Failed to create audio stream:', streamError.message);
-                    
+
                     // Don't throw immediately on last retry, instead return false to continue queue
                     if (streamRetryCount >= maxStreamRetries) {
                         console.log('[VOICE] Max retries reached for previous track');
@@ -269,13 +272,16 @@ class MusicManager {
             console.log(`[MUSIC] Starting stream creation for: ${nextTrack.url}`);
 
             while (streamRetryCount < maxStreamRetries) {
+                // Add delay to reduce chance of rate limiting
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
                 try {
                     // Add timeout protection for streaming
                     const streamPromise = play.stream(nextTrack.url, {
                         quality: 2 // highest quality audio
                     });
 
-                    const timeoutPromise = new Promise((_, reject) => 
+                    const timeoutPromise = new Promise((_, reject) =>
                         setTimeout(() => reject(new Error('Stream timeout - YouTube is taking too long to respond')), 10000)
                     );
 

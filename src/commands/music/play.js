@@ -378,8 +378,12 @@ module.exports = {
                     try {
                         // Fetch complete video information from YouTube
                         console.log('[INFO] Fetching video information from YouTube...');
+
+                        // Add delay to reduce chance of rate limiting
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+
                         let videoInfo;
-                        
+
                         try {
                             videoInfo = await rateLimiter.execute(async () => {
                                 const info = await play.video_info(selectedVideo.url);
@@ -388,7 +392,7 @@ module.exports = {
                             });
                         } catch (infoError) {
                             console.error('[ERROR] Failed to fetch video info:', infoError.message);
-                            
+
                             // If video info fails, try to continue with search result data as fallback
                             console.log('[WARN] Falling back to search result data due to video info fetch failure');
                             videoInfo = null;
