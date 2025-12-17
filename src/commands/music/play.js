@@ -1,7 +1,8 @@
-const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType, PermissionFlagsBits } = require('discord.js');
-const { getVoiceConnection } = require('@discordjs/voice');
+const { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { getVoiceConnection, joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
 const play = require('play-dl');
 const rateLimiter = require('../../utils/rateLimiter');
+const musicManager = require('../../modules/musicManager'); // Import the music manager
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -163,16 +164,8 @@ module.exports = {
                         embeds: []
                     });
                     console.log('[DEBUG] Message updated, starting playback...');
-                    // Direct playback without calling play command again
+
                     try {
-                        const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, demuxProbe, VoiceConnectionStatus, entersState } = require('@discordjs/voice');
-                        const ffmpeg = require('ffmpeg-static');
-                        const { spawn } = require('child_process');
-
-                        // Set FFmpeg path for play-dl (if needed in future versions)
-                        // play-dl v1.9.7+ should auto-detect ffmpeg-static when available
-                        console.log('[VOICE] FFmpeg path available:', !!ffmpeg);
-
                         // Get video info with retry logic
                         let videoInfo;
                         let infoRetryCount = 0;
@@ -195,85 +188,65 @@ module.exports = {
                             }
                         }
 
-                        // Enhanced stream handling with fallbacks and retry logic
-                        let resource;
-                        let streamRetryCount = 0;
-                        const maxStreamRetries = 3;
-
-                        while (streamRetryCount < maxStreamRetries) {
-                            try {
-                                const stream = await play.stream(videoInfo.url);
-                                const { stream: probeStream, type } = await demuxProbe(stream.stream);
-                                resource = createAudioResource(probeStream, { inputType: type });
-                                console.log('[VOICE] Using demuxed stream type:', type);
-                                break;
-                            } catch (probeError) {
-                                streamRetryCount++;
-                                if (probeError.message && probeError.message.includes('429') && streamRetryCount < maxStreamRetries) {
-                                    console.log(`[STREAM] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 5 seconds...`);
-                                    await new Promise(resolve => setTimeout(resolve, 5000 * streamRetryCount));
-                                    continue;
-                                }
-
-                                console.warn('[VOICE] demuxProbe failed, falling back to default stream:', probeError.message);
-                                try {
-                                    const stream = await play.stream(videoInfo.url);
-                                    resource = createAudioResource(stream.stream, { inputType: stream.type });
-                                    console.log('[VOICE] Using fallback stream type:', stream.type);
-                                    break;
-                                } catch (streamError) {
-                                    if (streamError.message && streamError.message.includes('429') && streamRetryCount < maxStreamRetries) {
-                                        console.log(`[STREAM_FALLBACK] Rate limit hit, retry ${streamRetryCount}/${maxStreamRetries} in 5 seconds...`);
-                                        await new Promise(resolve => setTimeout(resolve, 5000 * streamRetryCount));
-                                        continue;
-                                    }
-                                    console.error('[VOICE] All stream methods failed:', streamError.message);
-                                    throw new Error('Failed to create audio stream from video');
-                                }
-                            }
-                        }
-                        const player = createAudioPlayer();
-
+                        // Join voice channel if not connected
                         let connection = getVoiceConnection(selectInteraction.guild.id);
-                        console.log('[DEBUG] Creating connection, existing:', !!connection);
-                        if (!connection) {
-                            console.log('[DEBUG] Joining voice channel:', voiceChannel.id);
-                            connection = joinVoiceChannel({
-                                channelId: voiceChannel.id,
-                                guildId: selectInteraction.guild.id,
-                                adapterCreator: selectInteraction.guild.voiceAdapterCreator,
-                            });
-                            console.log('[DEBUG] Voice channel join initiated');
+                        try {
+                            if (!connection) {
+                                console.log('[DEBUG] Joining voice channel:', voiceChannel.id);
+                                connection = joinVoiceChannel({
+                                    channelId: voiceChannel.id,
+                                    guildId: selectInteraction.guild.id,
+                                    adapterCreator: selectInteraction.guild.voiceAdapterCreator,
+                                });
 
-                            // Monitor connection state
-                            connection.on(VoiceConnectionStatus.Signalling, () => {
-                                console.log('[VOICE] Requesting permission to join voice channel...');
-                            });
+                                // Monitor connection state
+                                connection.on(VoiceConnectionStatus.Signalling, () => {
+                                    console.log('[VOICE] Requesting permission to join voice channel...');
+                                });
 
-                            connection.on(VoiceConnectionStatus.Connecting, () => {
-                                console.log('[VOICE] Establishing connection...');
-                            });
+                                connection.on(VoiceConnectionStatus.Connecting, () => {
+                                    console.log('[VOICE] Establishing connection...');
+                                });
 
-                            connection.on(VoiceConnectionStatus.Ready, () => {
-                                console.log('[VOICE] Connection ready - playing audio!');
-                            });
+                                connection.on(VoiceConnectionStatus.Ready, () => {
+                                    console.log('[VOICE] Connection ready - playing audio!');
+                                });
 
-                            connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
-                                console.log('[VOICE] Disconnected from voice channel');
-                                try {
-                                    await Promise.race([
-                                        entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
-                                        entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
-                                    ]);
-                                } catch {
-                                    connection.destroy();
-                                    selectInteraction.client.user.setActivity(null);
-                                }
-                            });
+                                connection.on(VoiceConnectionStatus.Disconnected, async (oldState, newState) => {
+                                    console.log('[VOICE] Disconnected from voice channel');
+                                    try {
+                                        await Promise.race([
+                                            entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+                                            entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+                                        ]);
+                                    } catch {
+                                        try {
+                                            connection.destroy();
+                                        } catch (e) {
+                                            console.error('[VOICE] Error destroying connection:', e);
+                                        }
+                                        selectInteraction.client.user.setActivity(null);
+                                    }
+                                });
 
-                            connection.on('error', (error) => {
-                                console.error('[VOICE] Connection error:', error);
-                                selectInteraction.followUp({ content: '❌ Voice connection error occurred. Please try again.', flags: [64] });
+                                connection.on('error', (error) => {
+                                    console.error('[VOICE] Connection error details:', error);
+                                    selectInteraction.followUp({ content: `❌ Voice connection error: ${error.message}. Please try again.`, flags: [64] }).catch(console.error);
+                                });
+                            } else if (connection.joinConfig.channelId !== voiceChannel.id) {
+                                // If connected but to a different channel (should be caught by checks above, but safety net)
+                                console.log('[DEBUG] Rejoining voice channel:', voiceChannel.id);
+                                connection.rejoin({
+                                    channelId: voiceChannel.id,
+                                    selfDeaf: false,
+                                    selfMute: false
+                                });
+                            }
+                        } catch (joinError) {
+                            console.error('[VOICE] Critical join error:', joinError);
+                            return selectInteraction.followUp({
+                                content: `❌ Failed to join voice channel: ${joinError.message}. Make sure I have permissions!`,
+                                flags: [64]
                             });
                         }
 
@@ -285,9 +258,24 @@ module.exports = {
 
                             await entersState(connection, VoiceConnectionStatus.Ready, 15000);
 
+                            // Create song object
+                            const song = {
+                                title: videoInfo.video_details.title,
+                                url: videoInfo.video_details.url,
+                                duration: videoInfo.video_details.durationRaw,
+                                channel: videoInfo.video_details.channel?.name || 'Unknown Channel',
+                                thumbnail: videoInfo.video_details.thumbnails[0]?.url || null
+                            };
+
+                            // Use the music manager to play the song
+                            await musicManager.playSong(selectInteraction.guild.id, song, selectInteraction, connection);
+
+                            // Display the music controls after the song starts
                             await selectInteraction.editReply({
-                                content: `▶️ Now playing: **${selectedVideo.title}**`
+                                content: `▶️ Now playing: **${song.title}**`,
+                                components: createMusicButtons(selectInteraction.guild.id)
                             });
+
                         } catch (error) {
                             console.error('[VOICE] Connection timeout:', error);
                             await selectInteraction.followUp({
@@ -297,58 +285,6 @@ module.exports = {
                             connection.destroy();
                             return;
                         }
-
-                        player.play(resource);
-                        connection.subscribe(player);
-
-                        player.on(AudioPlayerStatus.Playing, () => {
-                            // Update bot's activity status to show what's playing
-                            selectInteraction.client.user.setActivity(videoInfo.video_details.title, { type: 0 }); // 0 is for "PLAYING"
-
-                            const embed = {
-                                title: '🎵 Now Playing',
-                                description: `**${videoInfo.video_details.title}**`,
-                                fields: [
-                                    { name: 'Duration', value: videoInfo.video_details.durationFormatted, inline: true },
-                                    { name: 'Channel', value: videoInfo.video_details.channel.name, inline: true }
-                                ],
-                                color: 0x0099FF,
-                                thumbnail: videoInfo.video_details.thumbnails[0]?.url ? { url: videoInfo.video_details.thumbnails[0].url } : null,
-                            };
-
-                            selectInteraction.followUp({ embeds: [embed] });
-                        });
-
-                        player.on(AudioPlayerStatus.Idle, () => {
-                            setTimeout(() => {
-                                if (connection.state.subscription?.player?.state.status === 'idle') {
-                                    connection.destroy();
-                                }
-                            }, 5000);
-
-                            // Clear the bot's activity status when playback ends
-                            selectInteraction.client.user.setActivity(null); // Clears the activity status
-                        });
-
-                        player.on('error', error => {
-                            console.error('Audio player error:', error);
-                            let errorMessage = 'An error occurred while playing audio.';
-
-                            if (error.message.includes('FFmpeg')) {
-                                errorMessage = '❌ FFmpeg error: Audio format not supported. Please try another song.';
-                            } else if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
-                                errorMessage = '❌ Network timeout: Could not stream audio. Please try again.';
-                            } else if (error.message.includes('403') || error.message.includes('forbidden')) {
-                                errorMessage = '❌ Video restricted: This video cannot be played due to restrictions.';
-                            } else if (error.message.includes('429')) {
-                                errorMessage = '❌ Rate limited: Too many requests. Please wait a moment and try again.';
-                            }
-
-                            selectInteraction.followUp({ content: errorMessage, flags: [64] });
-                            connection.destroy();
-                            selectInteraction.client.user.setActivity(null);
-                        });
-
                     } catch (error) {
                         console.error('[ERROR] Playback error occurred:');
                         console.error('[ERROR] Message:', error.message);
@@ -375,9 +311,6 @@ module.exports = {
 
                         await selectInteraction.followUp({ content: errorMessage, flags: [64] });
 
-                        if (connection) {
-                            connection.destroy();
-                        }
                         // Clear the bot's activity status when there's an error
                         selectInteraction.client.user.setActivity(null);
                     }
@@ -401,7 +334,6 @@ module.exports = {
                     }
                 }
             });
-
         } catch (error) {
             console.error('Search command error:', error);
 
@@ -434,3 +366,55 @@ module.exports = {
         }
     },
 };
+
+// Function to create music control buttons
+function createMusicButtons(guildId) {
+    return [
+        new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`music_previous_${guildId}`)
+                    .setLabel('⏮️ Previous')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`music_stop_${guildId}`)
+                    .setLabel('⏹️ Stop')
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId(`music_pause_${guildId}`)
+                    .setLabel('⏸️ Pause')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId(`music_skip_${guildId}`)
+                    .setLabel('⏭️ Skip')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId(`music_like_${guildId}`)
+                    .setLabel('❤️ Like')
+                    .setStyle(ButtonStyle.Secondary)
+            ),
+        new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`music_volumedown_${guildId}`)
+                    .setLabel('🔉 Vol -')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`music_volumeup_${guildId}`)
+                    .setLabel('🔊 Vol +')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`music_loop_${guildId}`)
+                    .setLabel('🔄 Loop')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`music_viewqueue_${guildId}`)
+                    .setLabel('📋 Queue')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`music_shuffle_${guildId}`)
+                    .setLabel('🔀 Shuffle')
+                    .setStyle(ButtonStyle.Secondary)
+            )
+    ];
+}

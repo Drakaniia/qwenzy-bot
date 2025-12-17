@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { getVoiceConnection, AudioPlayerStatus } = require('@discordjs/voice');
+const musicManager = require('../../modules/musicManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -11,12 +12,7 @@ module.exports = {
             return interaction.reply({ content: 'You need to be in a voice channel to pause music!', flags: [64] });
         }
 
-        const connection = getVoiceConnection(interaction.guild.id);
-        if (!connection) {
-            return interaction.reply({ content: 'I am not currently playing any music!', flags: [64] });
-        }
-
-        const player = connection.state.subscription?.player;
+        const player = musicManager.getPlayer(interaction.guild.id);
         if (!player) {
             return interaction.reply({ content: 'No music is currently playing!', flags: [64] });
         }
@@ -27,9 +23,13 @@ module.exports = {
                 return interaction.reply({ content: 'Music is already paused!', flags: [64] });
             }
 
-            // Pause the player
-            player.pause();
-            await interaction.reply('⏸️ Paused the music!');
+            // Pause the player using music manager
+            const paused = musicManager.pause(interaction.guild.id);
+            if (paused) {
+                await interaction.reply(`⏸️ Paused: **${musicManager.getCurrentTrack(interaction.guild.id)?.title || 'Unknown Track'}**`);
+            } else {
+                return interaction.reply({ content: 'Could not pause the music!', flags: [64] });
+            }
         } catch (error) {
             console.error('Pause command error:', error);
             try {

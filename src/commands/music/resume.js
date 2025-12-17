@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { getVoiceConnection, AudioPlayerStatus } = require('@discordjs/voice');
+const musicManager = require('../../modules/musicManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -11,12 +12,7 @@ module.exports = {
             return interaction.reply({ content: 'You need to be in a voice channel to resume music!', flags: [64] });
         }
 
-        const connection = getVoiceConnection(interaction.guild.id);
-        if (!connection) {
-            return interaction.reply({ content: 'I am not currently in a voice channel!', flags: [64] });
-        }
-
-        const player = connection.state.subscription?.player;
+        const player = musicManager.getPlayer(interaction.guild.id);
         if (!player) {
             return interaction.reply({ content: 'No music is currently loaded!', flags: [64] });
         }
@@ -27,9 +23,13 @@ module.exports = {
                 return interaction.reply({ content: 'Music is not paused!', flags: [64] });
             }
 
-            // Resume the player
-            player.unpause();
-            await interaction.reply('▶️ Resumed the music!');
+            // Resume the player using music manager
+            const resumed = musicManager.resume(interaction.guild.id);
+            if (resumed) {
+                await interaction.reply(`▶️ Resumed: **${musicManager.getCurrentTrack(interaction.guild.id)?.title || 'Unknown Track'}**`);
+            } else {
+                return interaction.reply({ content: 'Could not resume the music!', flags: [64] });
+            }
         } catch (error) {
             console.error('Resume command error:', error);
             try {
