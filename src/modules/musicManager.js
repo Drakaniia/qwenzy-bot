@@ -232,12 +232,14 @@ class MusicManager {
         }
 
         this.setCurrentTrack(guildId, nextTrack);
+        console.log(`[MUSIC] Set current track to: ${nextTrack.title}`);
 
         try {
             // Create audio resource with improved error handling
             let resource;
             let streamRetryCount = 0;
             const maxStreamRetries = 3;
+            console.log(`[MUSIC] Starting stream creation for: ${nextTrack.url}`);
 
             while (streamRetryCount < maxStreamRetries) {
                 try {
@@ -272,9 +274,13 @@ class MusicManager {
                 const volume = this.getVolume(guildId);
                 if (volume !== 1.0) {
                     resource.volume.setVolume(volume);
+                    console.log(`[MUSIC] Applied volume: ${volume}`);
                 }
 
+                console.log(`[MUSIC] Starting player.play() for: ${nextTrack.title}`);
                 player.play(resource);
+            } else {
+                console.log(`[MUSIC] Failed to create audio resource for: ${nextTrack.title}`);
             }
         } catch (error) {
             console.error('Error playing next track:', error);
@@ -293,26 +299,32 @@ class MusicManager {
     }
 
     async playSong(guildId, song, interaction, connection) {
+        console.log(`[MUSIC] playSong called for guild ${guildId} with song: ${song.title}`);
+        
         if (!this.players.has(guildId)) {
+            console.log(`[MUSIC] Creating new player for guild ${guildId}`);
             const player = createAudioPlayer();
             this.setPlayer(guildId, player);
 
             // Set up player events
             player.on(AudioPlayerStatus.Playing, () => {
+                console.log(`[MUSIC] Player started playing`);
                 const track = this.getCurrentTrack(guildId);
                 if (track && interaction) {
                     // Update bot's activity
                     interaction.client.user.setActivity(track.title, { type: 0 });
+                    console.log(`[MUSIC] Updated bot activity to: ${track.title}`);
                 }
             });
 
             player.on(AudioPlayerStatus.Idle, async () => {
+                console.log(`[MUSIC] Player went idle, playing next song`);
                 // When a song finishes, play the next one
                 await this.playNext(guildId, interaction);
             });
 
             player.on('error', async (error) => {
-                console.error('Audio player error:', error);
+                console.error('[MUSIC] Audio player error:', error);
                 
                 let errorMessage = 'An error occurred while playing audio.';
                 if (error.message.includes('FFmpeg')) {
@@ -326,7 +338,11 @@ class MusicManager {
                 }
 
                 if (interaction) {
-                    await interaction.followUp({ content: errorMessage, flags: [64] });
+                    try {
+                        await interaction.followUp({ content: errorMessage, flags: [64] });
+                    } catch (followUpError) {
+                        console.log('[MUSIC] Could not send error followUp:', followUpError.message);
+                    }
                 }
                 
                 this.disconnect(guildId);
@@ -335,10 +351,24 @@ class MusicManager {
 
         const player = this.getPlayer(guildId);
         
-        // If there's an active connection, unsubscribe and reconnect
+        // If there's an active connection, subscribe player to it
         if (connection) {
+            console.log(`[MUSIC] Subscribing player to connection for guild ${guildId}`);
             this.setConnection(guildId, connection);
             connection.subscribe(player);
+        } else {
+            console.log(`[MUSIC] No connection provided for guild ${guildId}`);
+            if (interaction) {
+                try {
+                    await interaction.followUp({ 
+                        content: '❌ No voice connection available. Please make sure I\'m in a voice channel.', 
+                        flags: [64] 
+                    });
+                } catch (followUpError) {
+                    console.log('[MUSIC] Could not send connection error:', followUpError.message);
+                }
+            }
+            return;
         }
 
         // Add the song to the queue and play if nothing is currently playing
@@ -346,13 +376,19 @@ class MusicManager {
         
         // If player is idle or no current track, start playing immediately
         if (!this.getCurrentTrack(guildId) || player.state.status === AudioPlayerStatus.Idle) {
+            console.log(`[MUSIC] Starting immediate playback for: ${song.title}`);
             await this.playNext(guildId, interaction);
         } else {
+            console.log(`[MUSIC] Adding to queue: ${song.title} (current track exists, player status: ${player.state.status})`);
             // Otherwise, just add to queue
-            await interaction.followUp({ 
-                content: `🎵 Added **${song.title}** to the queue!`, 
-                flags: [64] 
-            });
+            try {
+                await interaction.followUp({ 
+                    content: `🎵 Added **${song.title}** to the queue!`, 
+                    flags: [64] 
+                });
+            } catch (followUpError) {
+                console.log('[MUSIC] Error adding to queue message:', followUpError.message);
+            }
         }
     }
 

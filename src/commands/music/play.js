@@ -90,6 +90,22 @@ module.exports = {
                 time: 30000 // Reduced timeout to 30 seconds
             });
 
+            collector.on('end', (collected, reason) => {
+                if (reason === 'time') {
+                    console.log('[DEBUG] Collector timed out');
+                    try {
+                        interaction.editReply({
+                            components: [],
+                            content: 'Search selection timed out. Please run /play again.'
+                        }).catch(() => {
+                            console.log('[INFO] Interaction expired, could not edit reply');
+                        });
+                    } catch (error) {
+                        console.log('[INFO] Interaction expired during timeout handling');
+                    }
+                }
+            });
+
             collector.on('collect', async (selectInteraction) => {
                 console.log('[DEBUG] Selection received from user:', selectInteraction.user.tag);
                 if (selectInteraction.user.id !== interaction.user.id) {
@@ -106,7 +122,7 @@ module.exports = {
                 if (selectedVideo) {
                     // Comprehensive permission and voice channel checks
                     const voiceChannel = selectInteraction.member.voice.channel;
-                    console.log('[DEBUG] Voice channel:', voiceChannel?.id || 'null');
+                    console.log('[DEBUG] Selected video, checking voice channel:', voiceChannel?.id || 'null');
 
                     if (!voiceChannel) {
                         await selectInteraction.update({
@@ -260,11 +276,11 @@ module.exports = {
 
                             // Create song object
                             const song = {
-                                title: videoInfo.video_details.title,
-                                url: videoInfo.video_details.url,
-                                duration: videoInfo.video_details.durationRaw,
-                                channel: videoInfo.video_details.channel?.name || 'Unknown Channel',
-                                thumbnail: videoInfo.video_details.thumbnails[0]?.url || null
+                                title: videoInfo?.video_details?.title || selectedVideo.title,
+                                url: videoInfo?.video_details?.url || selectedVideo.url,
+                                duration: videoInfo?.video_details?.durationRaw || 0,
+                                channel: videoInfo?.video_details?.channel?.name || selectedVideo.channel?.name || 'Unknown Channel',
+                                thumbnail: videoInfo?.video_details?.thumbnails?.[0]?.url || selectedVideo.thumbnail || null
                             };
 
                             // Use the music manager to play the song
