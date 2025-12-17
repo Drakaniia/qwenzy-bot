@@ -2,7 +2,7 @@
 class RateLimiter {
     constructor() {
         this.lastCall = 0;
-        this.minInterval = 3000; // 3 seconds between calls
+        this.minInterval = 5000; // 5 seconds between calls
         this.queue = [];
         this.processing = false;
     }

@@ -338,10 +338,11 @@ module.exports = {
                             } catch (activityError) {
                                 console.log('[INFO] Could not set bot activity:', activityError.message);
                             }
-                            
-                            return; // Skip musicManager.playSong for now
 
-                                            // Update the message with current status if possible
+                            // Actually play the song using the music manager
+                            await musicManager.playSong(selectInteraction.guild.id, song, selectInteraction, connection);
+
+                            // Update the message with current status if possible
                             try {
                                 await selectInteraction.editReply({
                                     content: `🎵 **${song.title}** is ready to play!`
