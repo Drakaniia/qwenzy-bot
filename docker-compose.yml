@@ -1,13 +1,30 @@
 version: '3.8'
 services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4-alpine
+    container_name: lavalink
+    restart: unless-stopped
+    ports:
+      - "2333:2333"
+    volumes:
+      - ./lavalink/application.yml:/opt/Lavalink/application.yml
+      - ./lavalink/plugins:/opt/Lavalink/plugins
+
   qweny-bot:
     build: .
     container_name: qweny-bot
     restart: unless-stopped
+    depends_on:
+      - lavalink
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      # If you run the bot in docker-compose, point it at the lavalink service.
+      - LAVALINK_HOST=lavalink
+      - LAVALINK_PORT=2333
+      - LAVALINK_PASSWORD=youshallnotpass
+      - LAVALINK_SECURE=false
     ports:
       - "3000:3000"
     volumes:

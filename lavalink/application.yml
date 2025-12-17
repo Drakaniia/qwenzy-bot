@@ -1,0 +1,16 @@
+server:
+  port: 2333
+  address: 0.0.0.0
+
+plugins:
+  - dependency: "dev.lavalink.youtube:youtube-plugin:1.7.2"
+    repository: "https://maven.lavalink.dev/releases"
+
+lavalink:
+  server:
+    password: "youshallnotpass"
+
+logging:
+  level:
+    root: INFO
+    lavalink: INFO
