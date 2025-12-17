@@ -1,5 +1,5 @@
 const { createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus, demuxProbe } = require('@discordjs/voice');
-const ytdl = require('@distube/ytdl-core');
+const ytdl = require('ytdl-core');
 const rateLimiter = require('../utils/rateLimiter');
 
 class MusicManager {
