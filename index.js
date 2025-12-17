@@ -30,16 +30,33 @@ function validateDependencies() {
 // Validate voice dependencies specifically
 function validateVoiceDependencies() {
     try {
-        // Test if we can create required components
-        const play = require('play-dl');
+        // Test if we can load required voice stack components
+        require('@discordjs/voice');
+        require('play-dl');
+
         const ffmpegPath = require('ffmpeg-static');
         console.log('[VOICE] ✅ play-dl and ffmpeg-static are available');
-
-        // play-dl should work with ffmpeg-static automatically
         console.log('[VOICE] FFmpeg path:', ffmpegPath);
+
+        // Opus encoder is required for audio playback (native module; can fail to install on Windows)
+        try {
+            require('@discordjs/opus');
+            console.log('[VOICE] ✅ @discordjs/opus is available (Opus encoder)');
+        } catch (opusError) {
+            console.error('[VOICE] ❌ @discordjs/opus is NOT available:', opusError.message);
+            console.error('[VOICE] Audio playback will not work until an Opus encoder is installed.');
+        }
+
+        // Sodium is strongly recommended for voice encryption performance/stability
+        try {
+            require('libsodium-wrappers');
+            console.log('[VOICE] ✅ libsodium-wrappers is available');
+        } catch (sodiumError) {
+            console.warn('[VOICE] ⚠️ libsodium-wrappers not available:', sodiumError.message);
+        }
     } catch (error) {
-        console.error('[ERROR] ❌ Voice dependency validation failed:', error.message);
-        console.log('[ERROR] Voice commands may not work properly!');
+        console.error('[VOICE] ❌ Voice dependency validation failed:', error.message);
+        console.log('[VOICE] Voice commands may not work properly!');
     }
 }
 
