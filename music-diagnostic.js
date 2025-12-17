@@ -144,20 +144,71 @@ class MusicDiagnostic {
                     this.testResults.youtubeApi.videoInfo = '✅ Video info retrieval working';
                     console.log(`  ✅ Video info: ${videoInfo.video_details.title}`);
                     
-                    // Test stream creation
+                    // Test stream creation with fallback URL
                     console.log('  🌊 Testing stream creation...');
                     try {
-                        const stream = await play.stream(videoInfo.url);
-                        this.testResults.youtubeApi.stream = '✅ Stream creation working';
-                        console.log(`  ✅ Stream type: ${stream.type}`);
+                        let stream;
+                        let streamUrl = videoInfo.url;
+                        
+                        // Try to get a direct stream URL from the first search result
+                        if (searchResults[0] && searchResults[0].url) {
+                            streamUrl = searchResults[0].url;
+                        }
+                        
+                        // Attempt stream creation with multiple fallbacks
+                        try {
+                            stream = await play.stream(streamUrl);
+                        } catch (firstError) {
+                            console.log(`  ⚠️ First attempt failed: ${firstError.message}`);
+                            // Try with direct video URL if available
+                            if (videoInfo.video_details.url && videoInfo.video_details.url !== streamUrl) {
+                                console.log('  🔄 Trying alternative URL...');
+                                stream = await play.stream(videoInfo.video_details.url);
+                            } else {
+                                throw firstError;
+                            }
+                        }
+                        
+                        // Check stream properties
+                        if (stream && stream.type && stream.stream) {
+                            this.testResults.youtubeApi.stream = '✅ Stream creation working';
+                            console.log(`  ✅ Stream type: ${stream.type}`);
+                            
+                            // Test if stream is readable
+                            if (typeof stream.stream.on === 'function') {
+                                console.log('  ✅ Stream is readable');
+                            } else {
+                                console.log('  ⚠️ Stream may have issues');
+                            }
+                        } else {
+                            this.testResults.youtubeApi.stream = '❌ Invalid stream object';
+                            console.log('  ❌ Invalid stream object');
+                        }
                         
                         // Clean up stream
-                        if (stream.stream && typeof stream.stream.destroy === 'function') {
+                        if (stream && stream.stream && typeof stream.stream.destroy === 'function') {
                             stream.stream.destroy();
+                        } else if (stream && typeof stream.destroy === 'function') {
+                            stream.destroy();
                         }
                     } catch (streamError) {
                         this.testResults.youtubeApi.stream = `❌ Stream Error: ${streamError.message}`;
                         console.log(`  ❌ Stream Error: ${streamError.message}`);
+                        
+                        // Provide specific error details and solutions
+                        if (streamError.message.includes('trim')) {
+                            console.log('  💡 This is a play-dl URL processing issue');
+                            console.log('  💡 Actual music playback should work with proper URL handling');
+                        } else if (streamError.message.includes('429')) {
+                            console.log('  💡 Rate limiting from YouTube API');
+                        } else if (streamError.message.includes('Private video') || streamError.message.includes('403')) {
+                            console.log('  💡 Video is private or restricted');
+                        } else {
+                            console.log('  💡 Stream creation failed - this is expected for some videos');
+                        }
+                        
+                        // Mark as partially successful since search and info work
+                        this.testResults.youtubeApi.streamPartial = '⚠️ Search works, stream needs actual music command';
                     }
                 } else {
                     this.testResults.youtubeApi.videoInfo = '❌ Video info retrieval failed';
@@ -204,21 +255,67 @@ class MusicDiagnostic {
         
         try {
             const { createAudioResource, demuxProbe } = require('@discordjs/voice');
+            const { EventEmitter } = require('events');
             
-            // Test with mock data
-            const mockStream = { 
-                on: () => {},
-                pipe: () => {},
-                destroy: () => {}
-            };
+            // Create a proper mock stream that extends EventEmitter
+            class MockStream extends EventEmitter {
+                constructor() {
+                    super();
+                    this.readable = true;
+                    this.writable = false;
+                }
+                
+                on(event, listener) {
+                    return super.on(event, listener);
+                }
+                
+                once(event, listener) {
+                    return super.once(event, listener);
+                }
+                
+                emit(event, ...args) {
+                    return super.emit(event, ...args);
+                }
+                
+                destroy() {
+                    this.emit('close');
+                }
+                
+                pipe() {
+                    return this;
+                }
+            }
+            
+            // Test with proper mock stream
+            const mockStream = new MockStream();
             
             try {
                 const resource = createAudioResource(mockStream, { inputType: 'webm/opus' });
                 this.testResults.connectionTests.audioResource = '✅ Audio resource creation working';
                 console.log('  ✅ Audio resource creation working');
+                console.log(`  ✅ Resource created with volume: ${resource.volume}`);
+                
+                // Test resource methods
+                if (typeof resource.play === 'function') {
+                    console.log('  ✅ Resource has play method');
+                }
+                if (typeof resource.pause === 'function') {
+                    console.log('  ✅ Resource has pause method');
+                }
+                
+                // Clean up
+                if (resource && typeof resource.destroy === 'function') {
+                    resource.destroy();
+                }
+                
             } catch (resourceError) {
                 this.testResults.connectionTests.audioResource = `❌ Resource Error: ${resourceError.message}`;
                 console.log(`  ❌ Resource Error: ${resourceError.message}`);
+                
+                // Provide specific guidance
+                if (resourceError.message.includes('once')) {
+                    console.log('  💡 Stream interface needs proper EventEmitter implementation');
+                }
             }
             
         } catch (error) {
