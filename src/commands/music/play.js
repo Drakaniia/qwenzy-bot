@@ -36,11 +36,14 @@ if (process.env.YOUTUBE_COOKIE) {
 
 // Initialize play-dl with basic configuration
 try {
-    play.update();
-    console.log('[INIT] play-dl library updated successfully');
-} catch (updateError) {
-    console.warn('[INIT] Warning: Could not update play-dl library:', updateError.message);
-    console.log('[INIT] This is not critical, continuing with available library functions');
+    // Check if play-dl is properly loaded with YouTube functionality
+    if (typeof play.search === 'function') {
+        console.log('[INIT] play-dl search function is available');
+    } else {
+        console.error('[INIT] ERROR: play-dl search function is not available!');
+    }
+} catch (initError) {
+    console.error('[INIT] Error checking play-dl functionality:', initError.message);
 }
 
 // Helper function to check if interaction is expired
