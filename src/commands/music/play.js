@@ -220,27 +220,44 @@ module.exports = {
                     }
 
                     console.log('[DEBUG] Passed all checks, starting playback...');
+                    
+                    // Immediately acknowledge the selection to prevent interaction timeout
                     await selectInteraction.update({
-                        content: '▶️ Starting playback...',
+                        content: '▶️ Processing song...',
                         components: [],
                         embeds: []
                     });
 
                     try {
-                        // Get video info with retry logic
+                        // Get video info with retry logic and timeout protection
                         let videoInfo;
                         let infoRetryCount = 0;
                         const maxInfoRetries = 3;
 
+                        // Check if interaction is still valid before starting video info
+                        const interactionAge = Date.now() - selectInteraction.createdTimestamp;
+                        if (interactionAge > (12 * 60 * 1000)) { // 12 minutes buffer
+                            console.log('[INFO] Interaction too old for video info processing');
+                            return;
+                        }
+
                         while (infoRetryCount < maxInfoRetries) {
                             try {
-                                videoInfo = await rateLimiter.execute(async () => {
-                                    return await play.video_info(selectedVideo.url);
-                                });
+                                videoInfo = await Promise.race([
+                                    rateLimiter.execute(async () => {
+                                        return await play.video_info(selectedVideo.url);
+                                    }),
+                                    new Promise((_, reject) => 
+                                        setTimeout(() => reject(new Error('Video info timeout')), 30000)
+                                    )
+                                ]);
                                 break;
                             } catch (infoError) {
                                 infoRetryCount++;
-                                if (infoError.message && infoError.message.includes('429') && infoRetryCount < maxInfoRetries) {
+                                if (infoError.message === 'Video info timeout' && infoRetryCount < maxInfoRetries) {
+                                    console.log(`[VIDEO_INFO] Timeout, retry ${infoRetryCount}/${maxInfoRetries}...`);
+                                    continue;
+                                } else if (infoError.message && infoError.message.includes('429') && infoRetryCount < maxInfoRetries) {
                                     console.log(`[VIDEO_INFO] Rate limit hit, retry ${infoRetryCount}/${maxInfoRetries} in 5 seconds...`);
                                     await new Promise(resolve => setTimeout(resolve, 5000 * infoRetryCount));
                                 } else {
@@ -313,7 +330,12 @@ module.exports = {
 
                         // Wait for connection to be ready before playing
                         try {
-                            await entersState(connection, VoiceConnectionStatus.Ready, 15000);
+                            await Promise.race([
+                                entersState(connection, VoiceConnectionStatus.Ready, 15000),
+                                new Promise((_, reject) => 
+                                    setTimeout(() => reject(new Error('Voice connection timeout')), 20000)
+                                )
+                            ]);
 
                             // Create song object
                             const song = {
@@ -343,11 +365,26 @@ module.exports = {
 
                         } catch (error) {
                             console.error('[VOICE] Connection timeout:', error);
-                            await selectInteraction.followUp({
-                                content: '❌ Failed to connect to voice channel. Please check my permissions and try again.',
-                                flags: [64]
-                            });
-                            connection.destroy();
+                            let errorMessage = '❌ Failed to connect to voice channel. Please check my permissions and try again.';
+                            if (error.message === 'Voice connection timeout') {
+                                errorMessage = '❌ Voice connection timed out. Please try again.';
+                            }
+                            
+                            try {
+                                await selectInteraction.followUp({
+                                    content: errorMessage,
+                                    flags: [64]
+                                });
+                            } catch (followUpError) {
+                                console.log('[INFO] Could not send connection error:', followUpError.message);
+                            }
+                            if (connection) {
+                                try {
+                                    connection.destroy();
+                                } catch (destroyError) {
+                                    console.error('[VOICE] Error destroying connection:', destroyError);
+                                }
+                            }
                             return;
                         }
                     } catch (error) {
