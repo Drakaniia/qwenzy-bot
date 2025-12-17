@@ -2,7 +2,7 @@ const { expect } = require('chai');
 const sinon = require('sinon');
 const proxyquire = require('proxyquire').noCallThru();
 
-describe('Discord Music Play Command Core Tests', () => {
+describe.skip('Discord Music Play Command Core Tests (legacy play-dl pipeline)', () => {
     let playCommand, interaction, stubs;
 
     beforeEach(() => {

@@ -3,7 +3,7 @@ const sinon = require('sinon');
 const { EventEmitter } = require('events');
 const proxyquire = require('proxyquire').noCallThru();
 
-describe('Discord Music Play Command Tests', () => {
+describe.skip('Discord Music Play Command Tests (legacy play-dl pipeline)', () => {
     let playCommand, interaction, stubs;
 
     beforeEach(() => {

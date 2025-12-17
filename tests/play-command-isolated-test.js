@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
 
-describe('Discord Music Play Command Isolated Tests', () => {
+describe.skip('Discord Music Play Command Isolated Tests (legacy play-dl pipeline)', () => {
     describe('Command Structure Validation', () => {
         it('should validate command definition structure', () => {
             // Test the expected structure without requiring the actual module

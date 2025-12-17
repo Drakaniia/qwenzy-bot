@@ -4,10 +4,8 @@ const musicManager = require('../modules/musicManager');
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
-        // Handle button interactions for music controls
         if (!interaction.isButton()) return;
 
-        // Check if the button is a music control button
         if (!interaction.customId.startsWith('music_')) return;
 
         const [_, action, guildId] = interaction.customId.split('_');
@@ -56,7 +54,7 @@ module.exports = {
 
 async function handlePrevious(interaction, guildId) {
     const currentTrack = musicManager.getCurrentTrack(guildId);
-    const hasPrevious = await musicManager.playPrevious(guildId, interaction);
+    const hasPrevious = await musicManager.playPrevious(guildId);
 
     if (hasPrevious) {
         await interaction.update({
@@ -77,7 +75,6 @@ async function handleStop(interaction, guildId) {
     const success = musicManager.stop(guildId);
     if (success) {
         await interaction.reply({ content: '🛑 Stopped the music and cleared the queue!', flags: [64] });
-        // Clear the bot's activity
         interaction.client.user.setActivity(null);
     } else {
         await interaction.reply({ content: '❌ Nothing to stop!', flags: [64] });
@@ -91,11 +88,11 @@ async function handlePause(interaction, guildId) {
         return;
     }
 
-    if (player.state.status === 'paused') {
+    if (player.paused) {
         const resumed = musicManager.resume(guildId);
         if (resumed) {
             await interaction.update({
-                content: `▶️ Resumed: **${musicManager.getCurrentTrack(guildId)?.title || 'Unknown Track'}**`,
+                content: `▶️ Resumed: **${musicManager.getCurrentTrack(guildId)?.info?.title || 'Unknown Track'}**`,
                 components: createMusicButtons(guildId)
             });
         } else {
@@ -105,7 +102,7 @@ async function handlePause(interaction, guildId) {
         const paused = musicManager.pause(guildId);
         if (paused) {
             await interaction.update({
-                content: `⏸️ Paused: **${musicManager.getCurrentTrack(guildId)?.title || 'Unknown Track'}**`,
+                content: `⏸️ Paused: **${musicManager.getCurrentTrack(guildId)?.info?.title || 'Unknown Track'}**`,
                 components: createMusicButtons(guildId)
             });
         } else {
@@ -115,7 +112,7 @@ async function handlePause(interaction, guildId) {
 }
 
 async function handleSkip(interaction, guildId) {
-    const skipped = musicManager.skip(guildId, interaction);
+    const skipped = await musicManager.skip(guildId);
     if (skipped) {
         await interaction.update({
             content: '⏭️ Skipping to the next track...',
@@ -129,7 +126,7 @@ async function handleSkip(interaction, guildId) {
 async function handleLike(interaction, guildId) {
     const currentTrack = musicManager.getCurrentTrack(guildId);
     if (currentTrack) {
-        await interaction.reply({ content: `❤️ You liked **${currentTrack.title}**! This feature is for demonstration.`, flags: [64] });
+        await interaction.reply({ content: `❤️ You liked **${currentTrack.info?.title || currentTrack.title}**! This feature is for demonstration.`, flags: [64] });
     } else {
         await interaction.reply({ content: '❌ No track is currently playing!', flags: [64] });
     }
@@ -137,7 +134,7 @@ async function handleLike(interaction, guildId) {
 
 async function handleVolumeDown(interaction, guildId) {
     let currentVolume = musicManager.getVolume(guildId);
-    currentVolume = Math.max(0, currentVolume - 0.1); // Decrease by 10%
+    currentVolume = Math.max(0, currentVolume - 0.1);
     musicManager.setVolume(guildId, currentVolume);
     
     await interaction.update({
@@ -148,7 +145,7 @@ async function handleVolumeDown(interaction, guildId) {
 
 async function handleVolumeUp(interaction, guildId) {
     let currentVolume = musicManager.getVolume(guildId);
-    currentVolume = Math.min(1, currentVolume + 0.1); // Increase by 10%
+    currentVolume = Math.min(1, currentVolume + 0.1);
     musicManager.setVolume(guildId, currentVolume);
     
     await interaction.update({
@@ -205,15 +202,14 @@ async function handleViewQueue(interaction, guildId) {
         return;
     }
     
-    let queueText = `🎵 Now Playing: **${currentTrack?.title || 'Nothing'}**\n`;
+    let queueText = `🎵 Now Playing: **${currentTrack?.info?.title || 'Nothing'}**\n`;
     
     if (queue.length > 0) {
         queueText += `\n📋 Next up (${queue.length} songs):\n`;
         
-        // Show first 10 songs in queue
         for (let i = 0; i < Math.min(queue.length, 10); i++) {
             const song = queue[i];
-            queueText += `${i + 1}. **${song.title}**\n`;
+            queueText += `${i + 1}. **${song.info?.title || song.title}**\n`;
         }
         
         if (queue.length > 10) {

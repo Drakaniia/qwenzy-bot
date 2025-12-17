@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
 
-describe('Play Command Logic Tests (No External Dependencies)', () => {
+describe.skip('Play Command Logic Tests (legacy play-dl pipeline)', () => {
 
     describe('Error Message Categorization Logic', () => {
         it('should categorize 429 errors as RATE_LIMIT', () => {

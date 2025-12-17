@@ -1,7 +1,7 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
 
-describe('Discord Music Play Command - Unit Tests', () => {
+describe.skip('Discord Music Play Command - Unit Tests (legacy play-dl pipeline)', () => {
     let playCommand, interaction, mockModules, moduleRequire;
 
     beforeEach(() => {

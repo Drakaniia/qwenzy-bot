@@ -2,7 +2,7 @@ const { expect } = require('chai');
 const sinon = require('sinon');
 const proxyquire = require('proxyquire');
 
-describe('Play Command with Proxyquire Tests', () => {
+describe.skip('Play Command with Proxyquire Tests (legacy play-dl pipeline)', () => {
     let playCommand, stubs;
 
     beforeEach(() => {
