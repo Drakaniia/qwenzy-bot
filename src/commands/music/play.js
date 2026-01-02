@@ -58,9 +58,16 @@ module.exports = {
             console.log('[SEARCH] Searching with Lavalink/Riffy:', query);
             const searchResults = await musicManager.search(query, interaction.user);
 
+            console.log('[SEARCH] Search results received:', {
+                hasResults: !!searchResults,
+                trackCount: searchResults?.tracks?.length,
+                loadType: searchResults?.loadType
+            });
+
             if (!searchResults || !searchResults.tracks || searchResults.tracks.length === 0) {
-                return interaction.editReply({ 
-                    content: `❌ No results found for "${query}". Try a different search term.` 
+                console.log('[SEARCH] No results found for query:', query);
+                return interaction.editReply({
+                    content: `❌ No results found for "${query}". Try a different search term.`
                 });
             }
 
@@ -125,7 +132,7 @@ module.exports = {
 
             const collector = collectorSource.createMessageComponentCollector({
                 componentType: ComponentType.StringSelect,
-                time: 30000,
+                time: 60000,
                 filter: (i) => i.customId === 'music-select'
             });
 
@@ -210,6 +217,7 @@ module.exports = {
                         }
 
                         try {
+                            console.log('[PLAYBACK] Creating/retrieving player for guild:', selectInteraction.guild.id);
                             const player = musicManager.getOrCreatePlayer({
                                 guildId: selectInteraction.guild.id,
                                 voiceChannelId: voiceChannel.id,
@@ -218,12 +226,26 @@ module.exports = {
                                 mute: false
                             });
 
-                            console.log('[LAVALINK] Player created/retrieved, adding track to queue');
+                            console.log('[PLAYBACK] Player created/retrieved:', {
+                                playerExists: !!player,
+                                voiceChannel: player.voiceChannel,
+                                textChannel: player.textChannel,
+                                isPlaying: player.playing,
+                                isPaused: player.paused,
+                                queueLength: player.queue.length
+                            });
+
+                            console.log('[PLAYBACK] Adding track to queue:', selectedTrack.info.title);
                             player.queue.add(selectedTrack);
 
+                            console.log('[PLAYBACK] Track added to queue. Queue length:', player.queue.length);
+
                             if (!player.playing && !player.paused) {
-                                console.log('[LAVALINK] Starting playback');
+                                console.log('[PLAYBACK] Starting playback for track:', selectedTrack.info.title);
                                 await player.play();
+                                console.log('[PLAYBACK] Playback initiated successfully');
+                            } else {
+                                console.log('[PLAYBACK] Player already playing/paused, track queued');
                             }
 
                             try {
@@ -299,6 +321,18 @@ module.exports = {
                         console.log('[INFO] Interaction expired or already handled');
                     }
                 }
+            });
+
+            collector.on('error', (error) => {
+                console.error('[ERROR] Collector error:', error);
+                try {
+                    if (!isInteractionExpired(interaction)) {
+                        interaction.editReply({
+                            components: [],
+                            content: 'An error occurred. Please try again.'
+                        }).catch(() => {});
+                    }
+                } catch (_) {}
             });
         } catch (error) {
             const timestamp = new Date().toISOString();
