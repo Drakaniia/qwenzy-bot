@@ -144,15 +144,27 @@ client.on('raw', (d) => {
 
 // Lavalink node health monitoring
 client.riffy.on('nodeConnect', (node) => {
-    console.log(`[LAVALINK] ✅ Node connected: ${node.options.host}:${node.options.port}`);
+    if (node && node.options) {
+        console.log(`[LAVALINK] ✅ Node connected: ${node.options.host}:${node.options.port}`);
+    } else {
+        console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
+    }
 });
 
 client.riffy.on('nodeError', (node, error) => {
-    console.error(`[LAVALINK] ❌ Node error: ${node.options.host}:${node.options.port} - ${error.message}`);
+    if (node && node.options) {
+        console.error(`[LAVALINK] ❌ Node error: ${node.options.host}:${node.options.port} - ${error.message}`);
+    } else {
+        console.error(`[LAVALINK] ❌ Node error: ${error.message}`);
+    }
 });
 
 client.riffy.on('nodeDisconnect', (node) => {
-    console.warn(`[LAVALINK] ⚠️ Node disconnected: ${node.options.host}:${node.options.port}`);
+    if (node && node.options) {
+        console.warn(`[LAVALINK] ⚠️ Node disconnected: ${node.options.host}:${node.options.port}`);
+    } else {
+        console.warn(`[LAVALINK] ⚠️ Node disconnected (no node info available)`);
+    }
 });
 
 client.commands = new Collection();
