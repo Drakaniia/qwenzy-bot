@@ -51,10 +51,19 @@ class MusicManager {
 
     async search(query, requester) {
         try {
+            console.log('[LAVALINK] Starting search for query:', query);
             const result = await this.riffy.resolve({ query, requester });
+            console.log('[LAVALINK] Search result received:', {
+                loadType: result?.loadType,
+                tracksCount: result?.tracks?.length,
+                hasPlaylist: !!result?.playlist
+            });
             return result;
         } catch (error) {
-            console.error('[LAVALINK] Search error:', error.message);
+            console.error('[LAVALINK] Search error:', {
+                message: error.message,
+                stack: error.stack
+            });
             throw error;
         }
     }
