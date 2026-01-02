@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "triggerWords": {
+    "tanginamo": {
+      "response": "Tangina mo Din <username>!",
+      "caseSensitive": false,
+      "wholeWord": true,
+      "cooldown": 5000
+    }
+  }
+}

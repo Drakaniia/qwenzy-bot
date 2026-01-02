@@ -1,0 +1,68 @@
+{
+  "_comment": "Auto-Response Configuration Example",
+  "_description": "This file shows how to configure automatic responses when users type specific words in Discord messages.",
+  "_instructions": [
+    "1. Copy this file to 'autoResponses.json' to use it",
+    "2. Add new trigger words under 'triggerWords'",
+    "3. Use <username> to insert the user's name in the response",
+    "4. Set 'enabled' to false to disable the feature globally"
+  ],
+  "enabled": true,
+  "triggerWords": {
+    "tanginamo": {
+      "_comment": "Example: Responds when someone types 'tanginamo'",
+      "response": "Tangina mo Din <username>!",
+      "caseSensitive": false,
+      "wholeWord": true,
+      "cooldown": 5000
+    },
+    "hello": {
+      "_comment": "Example: Responds to greetings",
+      "response": "Hello <username>! How are you today?",
+      "caseSensitive": false,
+      "wholeWord": true,
+      "cooldown": 3000
+    },
+    "bot": {
+      "_comment": "Example: Case-sensitive trigger (only matches 'bot', not 'Bot' or 'BOT')",
+      "response": "Yes, I'm a bot! Ask me anything.",
+      "caseSensitive": true,
+      "wholeWord": true,
+      "cooldown": 10000
+    },
+    "lol": {
+      "_comment": "Example: Partial word match (matches 'lol', 'lols', 'lolol', etc.)",
+      "response": "Haha, that's funny <username>!",
+      "caseSensitive": false,
+      "wholeWord": false,
+      "cooldown": 2000
+    }
+  },
+  "_settings_explanation": {
+    "enabled": "Set to false to disable all auto-responses globally",
+    "triggerWords": "Object containing all trigger word configurations",
+    "response": "The message the bot will send. Use <username> to insert the sender's name",
+    "caseSensitive": "If true, only matches exact case. If false, matches any case (e.g., 'Hello' matches 'hello', 'HELLO', 'HeLLo')",
+    "wholeWord": "If true, only matches whole words. If false, matches partial words (e.g., 'bot' matches 'bot' but not 'robot')",
+    "cooldown": "Minimum time in milliseconds between responses for the same user and trigger (5000 = 5 seconds)"
+  },
+  "_best_practices": [
+    "Use reasonable cooldowns to prevent spam (3-10 seconds recommended)",
+    "Keep responses short and friendly",
+    "Test new triggers in a private channel first",
+    "Avoid offensive or inappropriate responses",
+    "Consider using wholeWord: true to avoid accidental triggers",
+    "Use <username> to make responses more personal"
+  ],
+  "_adding_new_triggers": {
+    "steps": [
+      "1. Open autoResponses.json",
+      "2. Add a new entry under 'triggerWords'",
+      "3. Choose a unique trigger word (key)",
+      "4. Configure the response and settings",
+      "5. Save the file",
+      "6. The bot will automatically reload the configuration"
+    ],
+    "example": "\"newword\": {\n  \"response\": \"Response message here <username>!\",\n  \"caseSensitive\": false,\n  \"wholeWord\": true,\n  \"cooldown\": 5000\n}"
+  }
+}
