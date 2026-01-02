@@ -219,6 +219,10 @@ client.once(Events.ClientReady, async () => {
         client.riffy.init(client.user.id);
         musicManager.init(client);
         console.log('[LAVALINK] ✅ Riffy initialized');
+        
+        // Initialize Riffy event listeners
+        const riffyEvents = require('./src/events/riffyEvents');
+        riffyEvents.execute(client);
     } catch (e) {
         console.error('[LAVALINK] ❌ Failed to init Riffy:', e);
     }
