@@ -53,11 +53,19 @@ class MusicManager {
         try {
             console.log('[LAVALINK] Starting search for query:', query);
             const result = await this.riffy.resolve({ query, requester });
+
+            // Check if result is null or undefined
+            if (!result) {
+                console.error('[LAVALINK] Search returned null/undefined result');
+                throw new Error('Lavalink node returned no result. The node may be disconnected or unavailable.');
+            }
+
             console.log('[LAVALINK] Search result received:', {
-                loadType: result?.loadType,
-                tracksCount: result?.tracks?.length,
-                hasPlaylist: !!result?.playlist
+                loadType: result.loadType,
+                tracksCount: result.tracks?.length || 0,
+                hasPlaylist: !!result.playlist
             });
+
             return result;
         } catch (error) {
             console.error('[LAVALINK] Search error:', {
