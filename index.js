@@ -92,7 +92,7 @@ const client = new Client({
     ]
 });
 
-// Lavalink (Riffy) setup with fallback nodes for redundancy
+// Lavalink (Riffy) setup
 const lavalinkNodes = [
     // Primary node (configured via environment variables)
     {
@@ -100,20 +100,6 @@ const lavalinkNodes = [
         port: Number(process.env.LAVALINK_PORT || 2333),
         password: process.env.LAVALINK_PASSWORD || 'youshallnotpass',
         secure: String(process.env.LAVALINK_SECURE || 'false').toLowerCase() === 'true',
-    },
-    // Fallback node 1: lavalink.dev (public, stable)
-    {
-        host: 'lavalink.dev',
-        port: 443,
-        password: 'lavalink',
-        secure: true,
-    },
-    // Fallback node 2: lavalink.lexnexus.dev (public, stable)
-    {
-        host: 'lavalink.lexnexus.dev',
-        port: 2333,
-        password: 'lexnexus',
-        secure: false,
     }
 ];
 
