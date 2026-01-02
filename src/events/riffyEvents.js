@@ -6,6 +6,15 @@ module.exports = {
     async execute(client) {
         // Track started playing
         client.riffy.on('trackStart', (player, track) => {
+            console.log('[LAVALINK] ✅ trackStart event fired:', {
+                guildId: player.guildId,
+                trackTitle: track.info.title,
+                trackAuthor: track.info.author,
+                trackLength: track.info.length,
+                voiceChannel: player.voiceChannel,
+                textChannel: player.textChannel
+            });
+
             const channel = client.channels.cache.get(player.textChannel);
             if (channel) {
                 const embed = {
@@ -28,29 +37,35 @@ module.exports = {
                 };
                 channel.send({ embeds: [embed] }).catch(console.error);
             }
-            console.log(`[LAVALINK] Track started: ${track.info.title}`);
         });
 
         // Track ended
         client.riffy.on('trackEnd', (player, track) => {
-            console.log(`[LAVALINK] Track ended: ${track.info.title}`);
+            console.log('[LAVALINK] trackEnd event fired:', {
+                guildId: player.guildId,
+                trackTitle: track.info.title,
+                reason: track.info?.reason || 'unknown'
+            });
         });
 
         // Queue ended - destroy player after playing all tracks
         client.riffy.on('queueEnd', (player) => {
-            console.log(`[LAVALINK] Queue ended for guild ${player.guildId}`);
-            
+            console.log('[LAVALINK] queueEnd event fired:', {
+                guildId: player.guildId,
+                queueLength: player.queue.length
+            });
+
             const channel = client.channels.cache.get(player.textChannel);
             if (channel) {
                 channel.send({ content: '🎵 Queue finished! Add more songs to keep the party going!' }).catch(console.error);
             }
-            
+
             // Destroy player after 5 seconds if no new tracks are added
             setTimeout(() => {
                 const currentPlayer = musicManager.getPlayer(player.guildId);
                 if (currentPlayer && currentPlayer.queue.length === 0 && !currentPlayer.playing) {
                     currentPlayer.destroy();
-                    console.log(`[LAVALINK] Player destroyed after queue end`);
+                    console.log('[LAVALINK] Player destroyed after queue end');
                 }
             }, 5000);
         });
@@ -87,7 +102,11 @@ module.exports = {
 
         // Node error
         client.riffy.on('nodeError', (node, error) => {
-            console.error(`[LAVALINK] Node error: ${node.options.host} - ${error.message}`);
+            if (node && node.options) {
+                console.error(`[LAVALINK] Node error: ${node.options.host}:${node.options.port} - ${error.message}`);
+            } else {
+                console.error(`[LAVALINK] Node error: ${error.message}`);
+            }
         });
 
         console.log('[LAVALINK] ✅ Riffy event listeners initialized');
