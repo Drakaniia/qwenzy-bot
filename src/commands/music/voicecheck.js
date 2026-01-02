@@ -1,61 +1,86 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const musicManager = require('../../modules/musicManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('voicecheck')
-        .setDescription('Debug: verify the bot can join your voice channel (via Lavalink/Riffy)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Connect),
-
+        .setDescription('Check Lavalink node status and connectivity'),
     async execute(interaction) {
-        const voiceChannel = interaction.member?.voice?.channel;
-        if (!voiceChannel) {
-            return interaction.reply({ content: '❌ Join a voice channel first, then run /voicecheck.', flags: [64] });
+        await interaction.deferReply();
+
+        const riffy = interaction.client.riffy;
+
+        if (!riffy) {
+            return interaction.editReply({ content: '❌ Riffy is not initialized!' });
         }
 
-        const permissions = voiceChannel.permissionsFor(interaction.client.user);
-        if (!permissions?.has(PermissionFlagsBits.Connect) || !permissions?.has(PermissionFlagsBits.Speak)) {
-            return interaction.reply({ content: '❌ I need **Connect** and **Speak** permissions in your voice channel.', flags: [64] });
+        // Check node status
+        const nodes = riffy.nodes;
+        let nodeStatus = '📊 **Lavalink Node Status:**\n\n';
+
+        if (nodes && nodes.size > 0) {
+            nodes.forEach((node, id) => {
+                const status = node.connected ? '✅ Connected' : '❌ Disconnected';
+                const stats = node.stats || {};
+
+                nodeStatus += `**Node ${id}:**\n`;
+                nodeStatus += `- Status: ${status}\n`;
+                nodeStatus += `- Host: ${node.options.host}:${node.options.port}\n`;
+                nodeStatus += `- Secure: ${node.options.secure ? 'Yes' : 'No'}\n`;
+                nodeStatus += `- Players: ${stats.players || 0}\n`;
+                nodeStatus += `- Playing Players: ${stats.playingPlayers || 0}\n`;
+                nodeStatus += `- Uptime: ${stats.uptime ? Math.floor(stats.uptime / 1000) + 's' : 'N/A'}\n\n`;
+            });
+        } else {
+            nodeStatus += '❌ No nodes configured or available!\n';
         }
 
-        const existing = musicManager.getPlayer(interaction.guild.id);
-        if (existing && existing.voiceChannel && existing.voiceChannel !== voiceChannel.id) {
-            return interaction.reply({ content: '❌ I am already connected in another voice channel in this server. Stop/leave there first.', flags: [64] });
+        // Check active players
+        const activePlayers = [];
+        riffy.players.forEach((player, guildId) => {
+            activePlayers.push({
+                guildId,
+                voiceChannel: player.voiceChannel,
+                textChannel: player.textChannel,
+                playing: player.playing,
+                paused: player.paused,
+                queueLength: player.queue.length,
+                currentTrack: player.current?.info?.title || 'None'
+            });
+        });
+
+        let playerStatus = '\n🎵 **Active Players:**\n\n';
+        if (activePlayers.length > 0) {
+            activePlayers.forEach(p => {
+                playerStatus += `**Guild ${p.guildId}:**\n`;
+                playerStatus += `- Playing: ${p.playing ? 'Yes' : 'No'}\n`;
+                playerStatus += `- Paused: ${p.paused ? 'Yes' : 'No'}\n`;
+                playerStatus += `- Queue: ${p.queueLength} tracks\n`;
+                playerStatus += `- Current: ${p.currentTrack}\n\n`;
+            });
+        } else {
+            playerStatus += 'No active players.\n';
         }
 
-        await interaction.reply({ content: '🔊 Attempting to join your voice channel...', flags: [64] });
-
-        let player;
-        let created = false;
+        // Test search functionality
+        playerStatus += '\n🔍 **Testing Search:**\n';
         try {
-            if (existing) {
-                player = existing;
+            console.log('[VOICECHECK] Testing search functionality...');
+            const testResult = await riffy.resolve({ query: 'ytsearch:test', requester: interaction.user });
+            console.log('[VOICECHECK] Search test result:', testResult);
+            if (testResult && testResult.tracks && testResult.tracks.length > 0) {
+                playerStatus += '✅ Search is working!\n';
             } else {
-                created = true;
-                player = musicManager.getOrCreatePlayer({
-                    guildId: interaction.guild.id,
-                    voiceChannelId: voiceChannel.id,
-                    textChannelId: interaction.channel.id,
-                    deaf: true,
-                });
+                playerStatus += '⚠️ Search returned no results.\n';
             }
-
-            await player.connection.resolve();
-            await interaction.editReply('✅ Voice connection is **READY** (Lavalink/Riffy).');
         } catch (error) {
-            const message = error?.message || String(error);
-            try {
-                await interaction.editReply(`❌ Voice join failed: ${message}`);
-            } catch (_) {
-                // ignore
-            }
-        } finally {
-            // If this was only a check, clean up.
-            try {
-                if (created && player) player.destroy();
-            } catch (_) {
-                // ignore
-            }
+            console.error('[VOICECHECK] Search test failed:', error);
+            playerStatus += `❌ Search failed: ${error.message}\n`;
         }
-    },
+
+        await interaction.editReply({
+            content: nodeStatus + playerStatus,
+            flags: []
+        });
+    }
 };
