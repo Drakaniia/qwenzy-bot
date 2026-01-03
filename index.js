@@ -174,6 +174,9 @@ client.riffy.on('nodeDisconnect', (node) => {
     }
 });
 
+// Initialize musicManager immediately after creating client.riffy
+musicManager.init(client);
+
 client.commands = new Collection();
 
 // LOAD COMMANDS
@@ -236,7 +239,6 @@ client.once(Events.ClientReady, async () => {
     // Init Lavalink client
     try {
         client.riffy.init(client.user.id);
-        musicManager.init(client);
         console.log('[LAVALINK] ✅ Riffy initialized');
 
         // Initialize Riffy event listeners
