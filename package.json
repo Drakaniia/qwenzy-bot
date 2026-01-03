@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start:lavalink": "java -jar lavalink.jar",
     "start": "node deploy.js",
     "test": "mocha \"tests/**/*test.js\" --timeout 10000",
     "test:watch": "mocha tests/**/*.test.js --watch",
