@@ -106,24 +106,21 @@ const lavalinkNodes = [
         host: 'lavalink.jirayu.net',
         port: 443,
         password: 'youshallnotpass',
-        secure: true,
-        name: 'Public Fallback (Jirayu)'
+        secure: true
     },
     // Fallback public node (Rive)
     {
         host: 'lavalink.rive.wtf',
         port: 443,
         password: 'youshallnotpass',
-        secure: true,
-        name: 'Public Fallback (Rive)'
+        secure: true
     },
     // Fallback public node (Serenetia)
     {
         host: 'lavalinkv4.serenetia.com',
         port: 443,
         password: 'https://dsc.gg/ajidevserver',
-        secure: true,
-        name: 'Public Fallback (Serenetia)'
+        secure: true
     }
 ];
 
