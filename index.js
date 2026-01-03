@@ -100,6 +100,30 @@ const lavalinkNodes = [
         port: Number(process.env.LAVALINK_PORT || 2333),
         password: process.env.LAVALINK_PASSWORD || 'youshallnotpass',
         secure: String(process.env.LAVALINK_SECURE || 'false').toLowerCase() === 'true',
+    },
+    // Fallback public node (Jirayu)
+    {
+        host: 'lavalink.jirayu.net',
+        port: 443,
+        password: 'youshallnotpass',
+        secure: true,
+        name: 'Public Fallback (Jirayu)'
+    },
+    // Fallback public node (Rive)
+    {
+        host: 'lavalink.rive.wtf',
+        port: 443,
+        password: 'youshallnotpass',
+        secure: true,
+        name: 'Public Fallback (Rive)'
+    },
+    // Fallback public node (Serenetia)
+    {
+        host: 'lavalinkv4.serenetia.com',
+        port: 443,
+        password: 'https://dsc.gg/ajidevserver',
+        secure: true,
+        name: 'Public Fallback (Serenetia)'
     }
 ];
 
@@ -159,39 +183,39 @@ client.commands = new Collection();
 const foldersPath = path.join(__dirname, 'src/commands');
 const commandFolders = fs.readdirSync(foldersPath);
 
-    for (const folder of commandFolders) {
-        const commandsPath = path.join(foldersPath, folder);
-        const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-        for (const file of commandFiles) {
-            const filePath = path.join(commandsPath, file);
+for (const folder of commandFolders) {
+    const commandsPath = path.join(foldersPath, folder);
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ('data' in command && 'execute' in command) {
+            client.commands.set(command.data.name, command);
+        } else {
+            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+        }
+    }
+}
+
+// Load test commands folder for debugging
+try {
+    const testCommandsPath = path.join(__dirname, 'src/commands/music/test');
+    if (fs.existsSync(testCommandsPath)) {
+        const testCommandFiles = fs.readdirSync(testCommandsPath).filter(file => file.endsWith('.js'));
+        for (const file of testCommandFiles) {
+            const filePath = path.join(testCommandsPath, file);
             const command = require(filePath);
             if ('data' in command && 'execute' in command) {
                 client.commands.set(command.data.name, command);
+                console.log(`[TEST] Loaded test command: ${command.data.name}`);
             } else {
-                console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+                console.log(`[WARNING] The test command at ${filePath} is missing a required "data" or "execute" property.`);
             }
         }
     }
-    
-    // Load test commands folder for debugging
-    try {
-        const testCommandsPath = path.join(__dirname, 'src/commands/music/test');
-        if (fs.existsSync(testCommandsPath)) {
-            const testCommandFiles = fs.readdirSync(testCommandsPath).filter(file => file.endsWith('.js'));
-            for (const file of testCommandFiles) {
-                const filePath = path.join(testCommandsPath, file);
-                const command = require(filePath);
-                if ('data' in command && 'execute' in command) {
-                    client.commands.set(command.data.name, command);
-                    console.log(`[TEST] Loaded test command: ${command.data.name}`);
-                } else {
-                    console.log(`[WARNING] The test command at ${filePath} is missing a required "data" or "execute" property.`);
-                }
-            }
-        }
-    } catch (error) {
-        console.log('[INFO] No test commands folder found, skipping...');
-    }
+} catch (error) {
+    console.log('[INFO] No test commands folder found, skipping...');
+}
 
 // LOAD EVENTS
 const eventsPath = path.join(__dirname, 'src/events');
@@ -217,7 +241,7 @@ client.once(Events.ClientReady, async () => {
         client.riffy.init(client.user.id);
         musicManager.init(client);
         console.log('[LAVALINK] ✅ Riffy initialized');
-        
+
         // Initialize Riffy event listeners
         const riffyEvents = require('./src/events/riffyEvents');
         riffyEvents.execute(client);
@@ -258,17 +282,17 @@ client.on('interactionCreate', async interaction => {
         await command.execute(interaction);
     } catch (error) {
         console.error('Command execution error:', error);
-        
+
         // Check if interaction is expired before trying to respond
         const now = Date.now();
         const interactionAge = now - (interaction.createdTimestamp || now);
         const isExpired = interactionAge > (15 * 60 * 1000); // 15 minutes
-        
+
         if (isExpired) {
             console.log('[INFO] Interaction expired, not sending error message');
             return;
         }
-        
+
         try {
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp({ content: 'There was an error while executing this command!', flags: [64] });
