@@ -7,7 +7,10 @@ RUN apk add --no-cache python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev
 
 COPY package*.json ./
 RUN npm cache clean --force && rm -f package-lock.json
-RUN npm install --production
+# Install all dependencies (including dev) to run postinstall script
+RUN npm install
+# Prune dev dependencies after patches are applied
+RUN npm prune --production
 
 COPY . .
 
