@@ -19,12 +19,12 @@ services:
   # Lavalink configuration for production
   # You can use a free Lavalink service or self-host one
   - key: LAVALINK_HOST
-    value: lava-v4.ajieblogs.eu.org
+    value: lavalink.jirayu.net
   - key: LAVALINK_PORT
-    value: 80
+    value: 443
   - key: LAVALINK_PASSWORD
-    value: "https://dsc.gg/ajidevserver"
+    value: youshallnotpass
   - key: LAVALINK_SECURE
-    value: "false"
+    value: "true"
   - key: LAVALINK_SEARCH_PREFIX
     value: ytsearch
