@@ -55,6 +55,14 @@ module.exports = {
                 }
             }
 
+            // Check if music system is ready
+            if (!interaction.client.musicReady) {
+                console.log('[SEARCH] Music system not ready yet');
+                return interaction.editReply({
+                    content: '❌ Music system is not ready yet. The bot may still be starting up or Lavalink initialization failed. Please wait a moment and try again.'
+                });
+            }
+
             console.log('[SEARCH] Searching with Lavalink/Riffy:', query);
             const searchResults = await musicManager.search(query, interaction.user);
 

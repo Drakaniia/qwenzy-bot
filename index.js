@@ -244,8 +244,14 @@ client.once(Events.ClientReady, async () => {
         // Initialize Riffy event listeners
         const riffyEvents = require('./src/events/riffyEvents');
         riffyEvents.execute(client);
+
+        // Mark music system as ready
+        client.musicReady = true;
+        console.log('[LAVALINK] ✅ Music system ready');
     } catch (e) {
         console.error('[LAVALINK] ❌ Failed to init Riffy:', e);
+        client.musicReady = false;
+        console.error('[LAVALINK] ⚠️ Music commands will be unavailable');
     }
 
     if (process.env.GEMINI_API_KEY) {
