@@ -92,37 +92,59 @@ const client = new Client({
     ]
 });
 
+// Validate Lavalink environment variables
+console.log('[LAVALINK] Validating configuration...');
+const lavalinkHost = process.env.LAVALINK_HOST || 'localhost';
+const lavalinkPort = Number(process.env.LAVALINK_PORT || 2333);
+const lavalinkPassword = process.env.LAVALINK_PASSWORD || 'youshallnotpass';
+const lavalinkSecure = String(process.env.LAVALINK_SECURE || 'false').toLowerCase() === 'true';
+
+console.log('[LAVALINK] Using environment configuration:', {
+    host: lavalinkHost,
+    port: lavalinkPort,
+    secure: lavalinkSecure,
+    hasPassword: !!lavalinkPassword
+});
+
 // Lavalink (Riffy) setup
 const lavalinkNodes = [
     // Primary node (configured via environment variables)
     {
-        host: process.env.LAVALINK_HOST || 'localhost',
-        port: Number(process.env.LAVALINK_PORT || 2333),
-        password: process.env.LAVALINK_PASSWORD || 'youshallnotpass',
-        secure: String(process.env.LAVALINK_SECURE || 'false').toLowerCase() === 'true',
-    },
-    // Fallback public node (Jirayu)
-    {
-        host: 'lavalink.jirayu.net',
-        port: 443,
-        password: 'youshallnotpass',
-        secure: true
-    },
-    // Fallback public node (Rive)
-    {
-        host: 'lavalink.rive.wtf',
-        port: 443,
-        password: 'youshallnotpass',
-        secure: true
-    },
-    // Fallback public node (Serenetia)
-    {
-        host: 'lavalinkv4.serenetia.com',
-        port: 443,
-        password: 'https://dsc.gg/ajidevserver',
-        secure: true
+        host: lavalinkHost,
+        port: lavalinkPort,
+        password: lavalinkPassword,
+        secure: lavalinkSecure,
     }
 ];
+
+// Only add public fallback nodes if not in a production environment or if explicitly enabled
+if (process.env.USE_FALLBACK_NODES !== 'false') {
+    lavalinkNodes.push(
+        // Fallback public node (Jirayu)
+        {
+            host: 'lavalink.jirayu.net',
+            port: 443,
+            password: 'youshallnotpass',
+            secure: true
+        },
+        // Fallback public node (Rive)
+        {
+            host: 'lavalink.rive.wtf',
+            port: 443,
+            password: 'youshallnotpass',
+            secure: true
+        },
+        // Fallback public node (Serenetia)
+        {
+            host: 'lavalinkv4.serenetia.com',
+            port: 443,
+            password: 'https://dsc.gg/ajidevserver',
+            secure: true
+        }
+    );
+}
+
+console.log(`[LAVALINK] Configured ${lavalinkNodes.length} node(s) for connection`);
 
 console.log('[LAVALINK] Configuration:', {
     host: lavalinkNodes[0].host,
@@ -130,6 +152,12 @@ console.log('[LAVALINK] Configuration:', {
     secure: lavalinkNodes[0].secure,
     searchPrefix: process.env.LAVALINK_SEARCH_PREFIX || 'ytsearch'
 });
+
+// Log a warning if using localhost which might indicate a configuration issue in Docker environments
+if (lavalinkNodes[0].host === 'localhost' && lavalinkPort === 2333) {
+    console.warn('[LAVALINK] ⚠️ Using localhost for Lavalink host. If running in docker-compose, set LAVALINK_HOST=lavalink in your .env file.');
+    console.warn('[LAVALINK] ⚠️ If Lavalink is not running locally, music commands will fail.');
+}
 
 client.riffy = new Riffy(
     client,
@@ -171,6 +199,35 @@ client.riffy.on('nodeDisconnect', (node) => {
         console.warn(`[LAVALINK] ⚠️ Node disconnected: ${node.options.host}:${node.options.port}`);
     } else {
         console.warn(`[LAVALINK] ⚠️ Node disconnected (no node info available)`);
+    }
+
+    // Check if all nodes are disconnected, and update musicReady status accordingly
+    let allNodesDisconnected = true;
+    for (const [nodeId, node] of client.riffy.nodes.entries()) {
+        if (node.connected) {
+            allNodesDisconnected = false;
+            break;
+        }
+    }
+
+    if (allNodesDisconnected && client.musicReady) {
+        console.warn('[LAVALINK] ⚠️ All nodes disconnected, updating music system status');
+        client.musicReady = false;
+    }
+});
+
+// Also monitor when nodes connect to potentially restore musicReady status
+client.riffy.on('nodeConnect', (node) => {
+    if (node && node.options) {
+        console.log(`[LAVALINK] ✅ Node connected: ${node.options.host}:${node.options.port}`);
+    } else {
+        console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
+    }
+
+    // If music wasn't ready but now at least one node is connected, try to set it as ready
+    if (!client.musicReady) {
+        client.musicReady = true;
+        console.log('[LAVALINK] ✅ Music system ready after node reconnection');
     }
 });
 
@@ -245,7 +302,49 @@ client.once(Events.ClientReady, async () => {
         const riffyEvents = require('./src/events/riffyEvents');
         riffyEvents.execute(client);
 
-        // Mark music system as ready
+        // Wait for at least one node to connect before marking music system as ready
+        console.log('[LAVALINK] Waiting for node connections...');
+
+        // Set a timeout for node connection
+        const timeoutPromise = new Promise(resolve => {
+            setTimeout(() => {
+                console.log('[LAVALINK] ⚠️ Timeout waiting for node connections, continuing with available nodes');
+                resolve();
+            }, 10000); // 10 second timeout
+        });
+
+        // Wait for the first successful connection or the timeout
+        const connectionPromise = new Promise((resolve) => {
+            const onNodeConnect = (node) => {
+                if (node && node.options) {
+                    console.log(`[LAVALINK] ✅ Node connected: ${node.options.host}:${node.options.port}`);
+                } else {
+                    console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
+                }
+
+                // Remove the listeners to prevent multiple calls
+                client.riffy.removeListener('nodeConnect', onNodeConnect);
+                client.riffy.removeListener('nodeError', onNodeError);
+
+                resolve();
+            };
+
+            const onNodeError = (node, error) => {
+                if (node && node.options) {
+                    console.error(`[LAVALINK] ❌ Node error: ${node.options.host}:${node.options.port} - ${error.message}`);
+                } else {
+                    console.error(`[LAVALINK] ❌ Node error: ${error.message}`);
+                }
+            };
+
+            client.riffy.on('nodeConnect', onNodeConnect);
+            client.riffy.on('nodeError', onNodeError);
+        });
+
+        // Wait for either a connection or timeout
+        await Promise.race([connectionPromise, timeoutPromise]);
+
+        // Mark music system as ready after attempting connection
         client.musicReady = true;
         console.log('[LAVALINK] ✅ Music system ready');
     } catch (e) {

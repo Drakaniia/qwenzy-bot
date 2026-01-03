@@ -16,8 +16,8 @@ class MusicManager {
         if (!riffy) {
             throw new Error('Riffy is not initialized on the Discord client. Did you call client.riffy.init() and musicManager.init(client)?');
         }
-        if (!riffy.initiated) {
-            throw new Error('Riffy is not ready yet. The bot may still be starting up or Lavalink initialization failed. Please wait a moment and try again.');
+        if (!this.client.musicReady) {
+            throw new Error('Music system is not ready yet. The bot may still be starting up or Lavalink initialization failed. Please wait a moment and try again.');
         }
         return riffy;
     }
