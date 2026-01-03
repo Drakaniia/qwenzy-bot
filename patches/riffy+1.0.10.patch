@@ -1,0 +1,335 @@
+diff --git a/node_modules/riffy/build/structures/Node.js b/node_modules/riffy/build/structures/Node.js
+index bac9f07..c9be0c0 100644
+--- a/node_modules/riffy/build/structures/Node.js
++++ b/node_modules/riffy/build/structures/Node.js
+@@ -18,7 +18,6 @@ class Node {
+     this.sessionId = node.sessionId || null;
+     this.rest = new Rest(riffy, this);
+     Object.defineProperty(this, "options", {
+-      writable: false,
+       get() {
+         return options
+       }
+@@ -72,178 +71,176 @@ class Node {
+     this.reconnectAttempted = 1;
+ 
+     this.lastStats = Date.now();
+-  }
+-
+-
+-  lyrics = {
+-    /**
+-     * Checks if the node has all the required plugins available.
+-     * @param {boolean} [eitherOne=true] If set to true, will return true if at least one of the plugins is present.
+-     * @param {...string} plugins The plugins to look for.
+-     * @returns {Promise<boolean>} If the plugins are available.
+-     * @throws {RangeError} If the plugins are missing.
+-     */
+-    checkAvailable: async (eitherOne = true, ...plugins) => {
+-      if (!this.sessionId) throw new Error(`Node (${this.name}) is not Ready/Connected.`)
+-      if (!plugins.length) plugins = ["lavalyrics-plugin", "java-lyrics-plugin", "lyrics"];
+-
+-      const missingPlugins = [];
+ 
+-      plugins.forEach((plugin) => {
+-        const p = this.info.plugins.find((p) => p.name === plugin)
+-
+-        if (!p) {
+-          missingPlugins.push(plugin)
+-          return false;
++    // Initialize lyrics and mixer objects in constructor to avoid property descriptor conflicts
++    this.lyrics = {
++      /**
++       * Checks if the node has all the required plugins available.
++       * @param {boolean} [eitherOne=true] If set to true, will return true if at least one of the plugins is present.
++       * @param {...string} plugins The plugins to look for.
++       * @returns {Promise<boolean>} If the plugins are available.
++       * @throws {RangeError} If the plugins are missing.
++       */
++      checkAvailable: async (eitherOne = true, ...plugins) => {
++        if (!this.sessionId) throw new Error(`Node (${this.name}) is not Ready/Connected.`)
++        if (!plugins.length) plugins = ["lavalyrics-plugin", "java-lyrics-plugin", "lyrics"];
++
++        const missingPlugins = [];
++
++        plugins.forEach((plugin) => {
++          const p = this.info.plugins.find((p) => p.name === plugin)
++
++          if (!p) {
++            missingPlugins.push(plugin)
++            return false;
++          }
++
++          return true;
++        });
++
++        const AllPluginsMissing = missingPlugins.length === plugins.length;
++
++        if (eitherOne && AllPluginsMissing) {
++          throw new RangeError(`Node (${this.name}) is missing plugins: ${missingPlugins.join(", ")} (required for Lyrics)`)
++        } else if (!eitherOne && missingPlugins.length) {
++          throw new RangeError(`Node (${this.name}) is missing plugins: ${missingPlugins.join(", ")} (required for Lyrics)`)
+         }
+ 
+-        return true;
+-      });
+-
+-      const AllPluginsMissing = missingPlugins.length === plugins.length;
+-
+-      if (eitherOne && AllPluginsMissing) {
+-        throw new RangeError(`Node (${this.name}) is missing plugins: ${missingPlugins.join(", ")} (required for Lyrics)`)
+-      } else if (!eitherOne && missingPlugins.length) {
+-        throw new RangeError(`Node (${this.name}) is missing plugins: ${missingPlugins.join(", ")} (required for Lyrics)`)
+-      }
+-
+-      return true
+-    },
+-
+-    /**
+-     * Fetches lyrics for a given track or encoded track string.
+-     *
+-     * @param {Track|string} trackOrEncodedTrackStr - The track object or encoded track string.
+-     * @param {boolean} [skipTrackSource=false] - Whether to skip the track source and fetch from the highest priority source (configured on Lavalink Server).
+-     * @returns {Promise<Object|null>} The lyrics data or null if the plugin is unavailable Or If no lyrics were found OR some Http request error occured.
+-     * @throws {TypeError} If `trackOrEncodedTrackStr` is not a `Track` or `string`.
+-     */
+-    get: async (trackOrEncodedTrackStr, skipTrackSource = false) => {
+-      if (!(await this.lyrics.checkAvailable(false, "lavalyrics-plugin"))) return null;
+-      if (!(trackOrEncodedTrackStr instanceof Track) && typeof trackOrEncodedTrackStr !== "string") throw new TypeError(`Expected \`Track\` or \`string\` for \`trackOrEncodedTrackStr\` in "lyrics.get" but got \`${typeof trackOrEncodedTrackStr}\``)
++        return true
++      },
+ 
+-      let encodedTrackStr = typeof trackOrEncodedTrackStr === "string" ? trackOrEncodedTrackStr : trackOrEncodedTrackStr.track;
++      /**
++       * Fetches lyrics for a given track or encoded track string.
++       *
++       * @param {Track|string} trackOrEncodedTrackStr - The track object or encoded track string.
++       * @param {boolean} [skipTrackSource=false] - Whether to skip the track source and fetch from the highest priority source (configured on Lavalink Server).
++       * @returns {Promise<Object|null>} The lyrics data or null if the plugin is unavailable Or If no lyrics were found OR some Http request error occured.
++       * @throws {TypeError} If `trackOrEncodedTrackStr` is not a `Track` or `string`.
++       */
++      get: async (trackOrEncodedTrackStr, skipTrackSource = false) => {
++        if (!(await this.lyrics.checkAvailable(false, "lavalyrics-plugin"))) return null;
++        if (!(trackOrEncodedTrackStr instanceof Track) && typeof trackOrEncodedTrackStr !== "string") throw new TypeError(`Expected \`Track\` or \`string\` for \`trackOrEncodedTrackStr\` in "lyrics.get" but got \`${typeof trackOrEncodedTrackStr}\``)
++
++        let encodedTrackStr = typeof trackOrEncodedTrackStr === "string" ? trackOrEncodedTrackStr : trackOrEncodedTrackStr.track;
++
++        return await this.rest.makeRequest("GET", `/v4/lyrics?skipTrackSource=${skipTrackSource}&track=${encodedTrackStr}`);
++      },
+ 
+-      return await this.rest.makeRequest("GET", `/v4/lyrics?skipTrackSource=${skipTrackSource}&track=${encodedTrackStr}`);
+-    },
++      /** @description fetches Lyrics for Currently playing Track
++       * @param {string} guildId The Guild Id of the Player
++       * @param {boolean} skipTrackSource skips the Track Source & fetches from highest priority source (configured on Lavalink Server)
++       * @param {string} [plugin] The Plugin to use(**Only required if you have too many known (i.e java-lyrics-plugin, lavalyrics-plugin) Lyric Plugins**)
++       */
++      getCurrentTrack: async (guildId, skipTrackSource = false, plugin) => {
++        const DEFAULT_PLUGIN = "lavalyrics-plugin"
++        if (!(await this.lyrics.checkAvailable())) return null;
++
++        const nodePlugins = this.info?.plugins;
++        let requestURL = `/v4/sessions/${this.sessionId}/players/${guildId}/track/lyrics?skipTrackSource=${skipTrackSource}&plugin=${plugin}`
++
++        // If no `plugin` param is specified, check for `java-lyrics-plugin` or `lyrics` (also if lavalyrics-plugin is not available)
++        if (!plugin && (nodePlugins.find((p) => p.name === "java-lyrics-plugin") || nodePlugins.find((p) => p.name === "lyrics")) && !(nodePlugins.find((p) => p.name === DEFAULT_PLUGIN))) {
++          requestURL = `/v4/sessions/${this.sessionId}/players/${guildId}/lyrics?skipTrackSource=${skipTrackSource}`
++        } else if (plugin && ["java-lyrics-plugin", "lyrics"].includes(plugin)) {
++          // If `plugin` param is specified, And it's one of either `lyrics` or `java-lyrics-plugin`
++          requestURL = `/v4/sessions/${this.sessionId}/players/${guildId}/lyrics?skipTrackSource=${skipTrackSource}`
++        }
+ 
+-    /** @description fetches Lyrics for Currently playing Track
+-     * @param {string} guildId The Guild Id of the Player
+-     * @param {boolean} skipTrackSource skips the Track Source & fetches from highest priority source (configured on Lavalink Server)
+-     * @param {string} [plugin] The Plugin to use(**Only required if you have too many known (i.e java-lyrics-plugin, lavalyrics-plugin) Lyric Plugins**)
+-     */
+-    getCurrentTrack: async (guildId, skipTrackSource = false, plugin) => {
+-      const DEFAULT_PLUGIN = "lavalyrics-plugin"
+-      if (!(await this.lyrics.checkAvailable())) return null;
+-
+-      const nodePlugins = this.info?.plugins;
+-      let requestURL = `/v4/sessions/${this.sessionId}/players/${guildId}/track/lyrics?skipTrackSource=${skipTrackSource}&plugin=${plugin}`
+-
+-      // If no `plugin` param is specified, check for `java-lyrics-plugin` or `lyrics` (also if lavalyrics-plugin is not available)
+-      if (!plugin && (nodePlugins.find((p) => p.name === "java-lyrics-plugin") || nodePlugins.find((p) => p.name === "lyrics")) && !(nodePlugins.find((p) => p.name === DEFAULT_PLUGIN))) {
+-        requestURL = `/v4/sessions/${this.sessionId}/players/${guildId}/lyrics?skipTrackSource=${skipTrackSource}`
+-      } else if (plugin && ["java-lyrics-plugin", "lyrics"].includes(plugin)) {
+-        // If `plugin` param is specified, And it's one of either `lyrics` or `java-lyrics-plugin`
+-        requestURL = `/v4/sessions/${this.sessionId}/players/${guildId}/lyrics?skipTrackSource=${skipTrackSource}`
++        return await this.rest.makeRequest("GET", `${requestURL}`)
+       }
++    };
+ 
+-      return await this.rest.makeRequest("GET", `${requestURL}`)
+-    }
+-  }
++    // Initialize mixer object in constructor to avoid property descriptor conflicts
++    this.mixer = {
++      check: () => {
++        return this.info?.isNodelink ?? false;
++      },
+ 
+-  /**
+-   * @since 1.0.9
+-   */
+-  mixer = {
+-    check: () => {
+-      return this.info?.isNodelink ?? false;
+-    },
++      /**
++       * @typedef {Object} addMixLayerOptions
++       * @property {string} track.encoded Base64 encoded track string (optional if identifier provided)
++       * @property {string?} track.identifier Track identifier (optional if encoded provided)
++       * @property {string?} track.userData (Optional) Track User Data.
++       * @property {number?} volume Float 0.0 to 1.0 (Default: 0.8)
++       *
++       * @param {string} guildId
++       * @param {addMixLayerOptions} mixLayerOptions
++       * @returns
++       */
++      addMixLayer: async (guildId, mixLayerOptions) => {
++        if (!this.mixer.check()) {
++          throw new Error("This node is not a Nodelink Server");
++        }
+ 
+-    /**
+-     * @typedef {Object} addMixLayerOptions
+-     * @property {string} track.encoded Base64 encoded track string (optional if identifier provided)
+-     * @property {string?} track.identifier Track identifier (optional if encoded provided)
+-     * @property {string?} track.userData (Optional) Track User Data.
+-     * @property {number?} volume Float 0.0 to 1.0 (Default: 0.8)
+-     * 
+-     * @param {string} guildId 
+-     * @param {addMixLayerOptions} mixLayerOptions 
+-     * @returns 
+-     */
+-    addMixLayer: async (guildId, mixLayerOptions) => {
+-      if (!this.mixer.check()) {
+-        throw new Error("This node is not a Nodelink Server");
+-      }
++        if (mixLayerOptions && typeof mixLayerOptions !== "object") {
++          throw new TypeError("mixLayerOptions must be an object");
++        }
+ 
+-      if (mixLayerOptions && typeof mixLayerOptions !== "object") {
+-        throw new TypeError("mixLayerOptions must be an object");
+-      }
++        if (mixLayerOptions.track && typeof mixLayerOptions.track !== "object") {
++          throw new TypeError("mixLayerOptions.track must be an object");
++        }
+ 
+-      if (mixLayerOptions.track && typeof mixLayerOptions.track !== "object") {
+-        throw new TypeError("mixLayerOptions.track must be an object");
+-      }
++        if (mixLayerOptions.track.encoded && mixLayerOptions.track.identifier) {
++          throw new TypeError("mixLayerOptions.track.encoded and mixLayerOptions.track.identifier cannot be provided at the same time");
++        }
+ 
+-      if (mixLayerOptions.track.encoded && mixLayerOptions.track.identifier) {
+-        throw new TypeError("mixLayerOptions.track.encoded and mixLayerOptions.track.identifier cannot be provided at the same time");
+-      }
++        if (mixLayerOptions.volume !== undefined && typeof mixLayerOptions.volume !== "number" || mixLayerOptions.volume < 0 || mixLayerOptions.volume > 1) {
++          throw new TypeError("mixLayerOptions.volume must be a number between 0 and 1");
++        }
+ 
+-      if (mixLayerOptions.volume !== undefined && typeof mixLayerOptions.volume !== "number" || mixLayerOptions.volume < 0 || mixLayerOptions.volume > 1) {
+-        throw new TypeError("mixLayerOptions.volume must be a number between 0 and 1");
+-      }
++        const body = {
++          track: mixLayerOptions.track
++        }
+ 
+-      const body = {
+-        track: mixLayerOptions.track
+-      }
++        if (mixLayerOptions.volume) {
++          body.volume = mixLayerOptions.volume;
++        }
+ 
+-      if (mixLayerOptions.volume) {
+-        body.volume = mixLayerOptions.volume;
+-      }
+ 
++        return this.rest.makeRequest("POST", `/v4/sessions/${this.sessionId}/players/${guildId}/mix`, body)
++      },
+ 
+-      return this.rest.makeRequest("POST", `/v4/sessions/${this.sessionId}/players/${guildId}/mix`, body)
+-    },
++      getActiveMixLayers: async (guildId) => {
++        if (!this.mixer.check()) {
++          throw new Error("Node is not hosted with Nodelink Server");
++        }
++        return await this.rest.makeRequest("GET", `/v4/sessions/${this.sessionId}/players/${guildId}/mix`);
++      },
+ 
+-    getActiveMixLayers: async (guildId) => {
+-      if (!this.mixer.check()) {
+-        throw new Error("Node is not hosted with Nodelink Server");
+-      }
+-      return await this.rest.makeRequest("GET", `/v4/sessions/${this.sessionId}/players/${guildId}/mix`);
+-    },
++      updateMixLayerVolume: async (guildId, mixId, volume) => {
++        if (!this.mixer.check()) {
++          throw new Error("Node is not hosted with Nodelink Server");
++        }
++        if (!guildId || !mixId || !volume) {
++          throw new TypeError("guildId, mixId and volume are required to Update Mix Volume");
++        }
+ 
+-    updateMixLayerVolume: async (guildId, mixId, volume) => {
+-      if (!this.mixer.check()) {
+-        throw new Error("Node is not hosted with Nodelink Server");
+-      }
+-      if (!guildId || !mixId || !volume) {
+-        throw new TypeError("guildId, mixId and volume are required to Update Mix Volume");
+-      }
++        if (mixId !== undefined && typeof mixId !== "string") {
++          throw new TypeError("id must be a string");
++        }
+ 
+-      if (mixId !== undefined && typeof mixId !== "string") {
+-        throw new TypeError("id must be a string");
+-      }
++        if (volume !== undefined && typeof volume !== "number" || volume < 0 || volume > 1) {
++          throw new TypeError("volume must be a number between 0 and 1");
++        }
+ 
+-      if (volume !== undefined && typeof volume !== "number" || volume < 0 || volume > 1) {
+-        throw new TypeError("volume must be a number between 0 and 1");
+-      }
++        return this.rest.makeRequest("PATCH", `/v4/sessions/${this.sessionId}/players/${guildId}/mix/${mixId}`, { volume });
++      },
+ 
+-      return await this.rest.makeRequest("PATCH", `/v4/sessions/${this.sessionId}/players/${guildId}/mix/${mixId}`, { volume });
+-    },
++      removeMixLayer: async (guildId, mixId) => {
++        if (!this.mixer.check()) {
++          throw new Error("Node is not hosted with Nodelink Server");
++        }
++        if (!guildId || !mixId) {
++          throw new TypeError("guildId and mixId are required to Remove the Mix Layer");
++        }
+ 
+-    removeMixLayer: async (guildId, mixId) => {
+-      if (!this.mixer.check()) {
+-        throw new Error("Node is not hosted with Nodelink Server");
+-      }
+-      if (!guildId || !mixId) {
+-        throw new TypeError("guildId and mixId are required to Remove the Mix Layer");
+-      }
++        if (mixId !== undefined && typeof mixId !== "string") {
++          throw new TypeError("id must be a string");
++        }
+ 
+-      if (mixId !== undefined && typeof mixId !== "string") {
+-        throw new TypeError("id must be a string");
++        return this.rest.makeRequest("DELETE", `/v4/sessions/${this.sessionId}/players/${guildId}/mix/${mixId}`);
+       }
+-
+-      return await this.rest.makeRequest("DELETE", `/v4/sessions/${this.sessionId}/players/${guildId}/mix/${mixId}`);
+-    }
++    };
+   }
+ 
+   /**
