@@ -241,31 +241,31 @@ client.on('raw', (d) => {
 
 // Lavalink node health monitoring
 client.riffy.on('nodeConnect', (node) => {
-    if (node && node.options) {
-        console.log(`[LAVALINK] ✅ Node connected: ${node.options.host}:${node.options.port}`);
+    if (node && node.host) {
+        console.log(`[LAVALINK] ✅ Node connected: ${node.host}:${node.port}`);
     } else {
         console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
     }
 });
 
 client.riffy.on('nodeError', (node, error) => {
-    if (node && node.options) {
-        console.error(`[LAVALINK] ❌ Node error: ${node.options.host}:${node.options.port} - ${error.message}`);
+    if (node && node.host) {
+        console.error(`[LAVALINK] ❌ Node error: ${node.host}:${node.port} - ${error.message}`);
     } else {
         console.error(`[LAVALINK] ❌ Node error: ${error.message}`);
     }
 });
 
 client.riffy.on('nodeDisconnect', (node) => {
-    if (node && node.options) {
-        console.warn(`[LAVALINK] ⚠️ Node disconnected: ${node.options.host}:${node.options.port}`);
+    if (node && node.host) {
+        console.warn(`[LAVALINK] ⚠️ Node disconnected: ${node.host}:${node.port}`);
     } else {
         console.warn(`[LAVALINK] ⚠️ Node disconnected (no node info available)`);
     }
 
     // Check if all nodes are disconnected, and update musicReady status accordingly
     let allNodesDisconnected = true;
-    for (const [nodeId, node] of client.riffy.nodes.entries()) {
+    for (const [nodeId, node] of client.riffy.nodeMap.entries()) {
         if (node.connected) {
             allNodesDisconnected = false;
             break;
@@ -280,8 +280,8 @@ client.riffy.on('nodeDisconnect', (node) => {
 
 // Also monitor when nodes connect to potentially restore musicReady status
 client.riffy.on('nodeConnect', (node) => {
-    if (node && node.options) {
-        console.log(`[LAVALINK] ✅ Node connected: ${node.options.host}:${node.options.port}`);
+    if (node && node.host) {
+        console.log(`[LAVALINK] ✅ Node connected: ${node.host}:${node.port}`);
     } else {
         console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
     }
@@ -378,8 +378,8 @@ client.once(Events.ClientReady, async () => {
         // Wait for the first successful connection or the timeout
         const connectionPromise = new Promise((resolve) => {
             const onNodeConnect = (node) => {
-                if (node && node.options) {
-                    console.log(`[LAVALINK] ✅ Node connected: ${node.options.host}:${node.options.port}`);
+                if (node && node.host) {
+                    console.log(`[LAVALINK] ✅ Node connected: ${node.host}:${node.port}`);
                 } else {
                     console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
                 }
@@ -392,8 +392,8 @@ client.once(Events.ClientReady, async () => {
             };
 
             const onNodeError = (node, error) => {
-                if (node && node.options) {
-                    console.error(`[LAVALINK] ❌ Node error: ${node.options.host}:${node.options.port} - ${error.message}`);
+                if (node && node.host) {
+                    console.error(`[LAVALINK] ❌ Node error: ${node.host}:${node.port} - ${error.message}`);
                 } else {
                     console.error(`[LAVALINK] ❌ Node error: ${error.message}`);
                 }
