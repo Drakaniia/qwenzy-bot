@@ -3,7 +3,7 @@ services:
   name: qwenzy-bot
   runtime: node
   region: frankfurt
-  buildCommand: npm install
+  buildCommand: npm install && npx patch-package
   startCommand: npm start
   envVars:
   - key: NODE_VERSION
