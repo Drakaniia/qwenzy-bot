@@ -2,8 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev
+# Install build dependencies for native modules (canvas v2 requires these)
+RUN apk add --no-cache python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev pixman-dev pangomm-dev libxxf86vm-dev
 
 COPY package*.json ./
 RUN npm cache clean --force && rm -f package-lock.json
