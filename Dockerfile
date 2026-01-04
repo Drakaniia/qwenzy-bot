@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -7,8 +7,10 @@ RUN apk add --no-cache python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev
 
 COPY package*.json ./
 RUN npm cache clean --force && rm -f package-lock.json
-# Install all dependencies (including dev) to run postinstall script
+# Install all dependencies (including dev)
 RUN npm install
+# Apply patches using patch-package
+RUN npx patch-package
 # Prune dev dependencies after patches are applied
 RUN npm prune --production
 
