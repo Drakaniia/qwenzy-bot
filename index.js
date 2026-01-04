@@ -400,54 +400,11 @@ client.once(Events.ClientReady, async () => {
                 console.log('[LAVALINK] ⚠️ No nodes connected yet, but continuing anyway...');
                 client.musicReady = true;
             }
-                resolve();
-            }, 30000); // 30 second timeout for TLS connections to public nodes
-        });
-
-        // Wait for the first successful connection or the timeout
-        const connectionPromise = new Promise((resolve) => {
-            const onNodeConnect = (node) => {
-                if (node && node.host) {
-                    console.log(`[LAVALINK] ✅ Node connected: ${node.host}:${node.port}`);
-                    hasConnected = true;
-                } else {
-                    console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
-                }
-
-                // Remove the listeners to prevent multiple calls
-                client.riffy.removeListener('nodeConnect', onNodeConnect);
-                client.riffy.removeListener('nodeError', onNodeError);
-
-                resolve();
-            };
-
-            const onNodeError = (node, error) => {
-                if (node && node.host) {
-                    console.error(`[LAVALINK] ❌ Node error: ${node.host}:${node.port} - ${error.message}`);
-                } else {
-                    console.error(`[LAVALINK] ❌ Node error: ${error.message}`);
-                }
-            };
-
-            client.riffy.on('nodeConnect', onNodeConnect);
-            client.riffy.on('nodeError', onNodeError);
-        });
-
-        // Wait for either a connection or timeout
-        await Promise.race([connectionPromise, timeoutPromise]);
-
-        // Mark music system as ready after attempting connection
-        client.musicReady = true;
-        if (hasConnected) {
-            console.log('[LAVALINK] ✅ Music system ready');
-        } else {
-            console.log('[LAVALINK] ✅ Music system initialized (no nodes connected yet)');
+        } catch (e) {
+            console.error('[LAVALINK] ❌ Failed to init Riffy:', e);
+            client.musicReady = false;
+            console.error('[LAVALINK] ⚠️ Music commands will be unavailable');
         }
-    } catch (e) {
-        console.error('[LAVALINK] ❌ Failed to init Riffy:', e);
-        client.musicReady = false;
-        console.error('[LAVALINK] ⚠️ Music commands will be unavailable');
-    }
 
     if (process.env.GEMINI_API_KEY) {
         console.log('[INFO] 🧠 Gemini AI Key loaded successfully.');
