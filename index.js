@@ -367,12 +367,17 @@ client.once(Events.ClientReady, async () => {
         // Wait for at least one node to connect before marking music system as ready
         console.log('[LAVALINK] Waiting for node connections...');
 
+        // Track if any node actually connected
+        let hasConnected = false;
+
         // Set a timeout for node connection
         const timeoutPromise = new Promise(resolve => {
             setTimeout(() => {
-                console.log('[LAVALINK] ⚠️ Timeout waiting for node connections, continuing with available nodes');
+                if (!hasConnected) {
+                    console.log('[LAVALINK] ⚠️ Timeout waiting for node connections, continuing with available nodes');
+                }
                 resolve();
-            }, 10000); // 10 second timeout
+            }, 30000); // 30 second timeout for TLS connections to public nodes
         });
 
         // Wait for the first successful connection or the timeout
@@ -380,6 +385,7 @@ client.once(Events.ClientReady, async () => {
             const onNodeConnect = (node) => {
                 if (node && node.host) {
                     console.log(`[LAVALINK] ✅ Node connected: ${node.host}:${node.port}`);
+                    hasConnected = true;
                 } else {
                     console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
                 }
@@ -408,7 +414,11 @@ client.once(Events.ClientReady, async () => {
 
         // Mark music system as ready after attempting connection
         client.musicReady = true;
-        console.log('[LAVALINK] ✅ Music system ready');
+        if (hasConnected) {
+            console.log('[LAVALINK] ✅ Music system ready');
+        } else {
+            console.log('[LAVALINK] ✅ Music system initialized (no nodes connected yet)');
+        }
     } catch (e) {
         console.error('[LAVALINK] ❌ Failed to init Riffy:', e);
         client.musicReady = false;
