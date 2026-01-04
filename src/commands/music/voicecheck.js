@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+ const { SlashCommandBuilder } = require('discord.js');
 const musicManager = require('../../modules/musicManager');
 
 module.exports = {
@@ -77,10 +77,6 @@ module.exports = {
             console.error('[VOICECHECK] Search test failed:', error);
             playerStatus += `❌ Search failed: ${error.message}\n`;
         }
-
-        // Add musicReady status
-        const musicReadyStatus = interaction.client.musicReady ? '✅ Ready' : '❌ Not Ready';
-        playerStatus += `\n🎧 **Music System:** ${musicReadyStatus}\n`;
 
         await interaction.editReply({
             content: nodeStatus + playerStatus,
