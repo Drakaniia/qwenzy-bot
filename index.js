@@ -53,28 +53,14 @@ try {
         let NodeCode = fs.readFileSync(NodePath, 'utf8');
         let modified = false;
 
-        // Check for the specific problematic pattern (writable: false with a getter)
-        // We use a broader regex to catch variations in whitespace/formatting
-        const problemRegex = /Object\.defineProperty\(this,\s*"options",\s*\{[^}]*writable:\s*false,[^}]*get\(\)/s;
-
-        if (problemRegex.test(NodeCode)) {
+        // Simple and robust approach: just remove 'writable: false' lines
+        if (NodeCode.includes('writable: false')) {
             console.log('[LAVALINK] 🛠️ Found problematic Riffy code. Applying runtime patch...');
 
-            // Replace the entire defineProperty block with a safe version
-            // This regex matches the specific defineProperty call for "options" that has writable: false
-            NodeCode = NodeCode.replace(
-                /Object\.defineProperty\(this,\s*"options",\s*\{[^}]*writable:\s*false,\s*get\(\)\s*\{\s*return\s*options\s*\}\s*\}\);/s,
-                'Object.defineProperty(this, "options", { get() { return options } }); // Patched by Qweny'
-            );
-
+            // Remove 'writable: false,' entirely (including the line and extra whitespace)
+            NodeCode = NodeCode.replace(/^\s*writable:\s*false,?\s*$/gm, '');
             modified = true;
-
-            // Fallback: simple string replacement if regex missed (sometimes easier/safer)
-            // We need to remove 'writable: false' entirely, not just comment it out
-            if (NodeCode.includes('writable: false')) {
-                // Remove 'writable: false,' entirely (including trailing comma)
-                NodeCode = NodeCode.replace(/writable:\s*false,\s*/g, '');
-            }
+            console.log('[LAVALINK] ✅ Removed writable: false from Riffy Node.js');
         }
 
         if (modified) {
