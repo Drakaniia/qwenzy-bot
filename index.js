@@ -48,36 +48,53 @@ const path = require('path');
 try {
     const riffyPath = require.resolve('riffy');
     const NodePath = path.join(path.dirname(riffyPath), 'build', 'structures', 'Node.js');
-    
+
     if (fs.existsSync(NodePath)) {
         let NodeCode = fs.readFileSync(NodePath, 'utf8');
-        // Check if the problematic code still exists (patch wasn't applied)
-        const needsPatch = NodeCode.includes('writable: false') && 
-                          NodeCode.includes('Object.defineProperty(this, "options"') &&
-                          NodeCode.includes('get()');
-        
-        if (needsPatch) {
-            console.log('[LAVALINK] Applying runtime patch for Riffy Node.js compatibility...');
-            // Remove writable: false from the options property descriptor
-            // Handle various whitespace patterns
+        let modified = false;
+
+        // Check for the specific problematic pattern (writable: false with a getter)
+        // We use a broader regex to catch variations in whitespace/formatting
+        const problemRegex = /Object\.defineProperty\(this,\s*"options",\s*\{[^}]*writable:\s*false,[^}]*get\(\)/s;
+
+        if (problemRegex.test(NodeCode)) {
+            console.log('[LAVALINK] 🛠️ Found problematic Riffy code. Applying runtime patch...');
+
+            // Replace the entire defineProperty block with a safe version
+            // This regex matches the specific defineProperty call for "options" that has writable: false
             NodeCode = NodeCode.replace(
-                /Object\.defineProperty\(this,\s*"options",\s*\{[\s\n]*writable:\s*false,\s*\n\s*get\(\)/,
-                'Object.defineProperty(this, "options", {\n      get()'
+                /Object\.defineProperty\(this,\s*"options",\s*\{[^}]*writable:\s*false,\s*get\(\)\s*\{\s*return\s*options\s*\}\s*\}\);/s,
+                'Object.defineProperty(this, "options", { get() { return options } }); // Patched by Qweny'
             );
-            // Also try alternative format
-            NodeCode = NodeCode.replace(
-                /Object\.defineProperty\(this,\s*"options",\s*\{[^\}]*writable:\s*false,\s*[^\}]*get\(\)/,
-                (match) => match.replace(/writable:\s*false,\s*/, '')
-            );
+
+            modified = true;
+
+            // Fallback: simple string replacement if regex missed (sometimes easier/safer)
+            // We need to remove 'writable: false' entirely, not just comment it out
+            if (NodeCode.includes('writable: false')) {
+                // Remove 'writable: false,' entirely (including trailing comma)
+                NodeCode = NodeCode.replace(/writable:\s*false,\s*/g, '');
+            }
+        }
+
+        if (modified) {
             fs.writeFileSync(NodePath, NodeCode, 'utf8');
-            console.log('[LAVALINK] ✅ Runtime patch applied successfully');
+            console.log('[LAVALINK] ✅ Runtime patch applied successfully to Riffy Node.js');
+
+            // Clear require cache to ensure the patched version is loaded
+            delete require.cache[require.resolve('riffy')];
+            delete require.cache[NodePath];
         } else {
-            console.log('[LAVALINK] ✅ Riffy appears to be already patched');
+            // Double check if it was already patched or simply doesn't match
+            if (!NodeCode.includes("writable: false")) {
+                console.log('[LAVALINK] ✅ Riffy is clean (patch already applied or not needed)');
+            } else {
+                console.warn('[LAVALINK] ⚠️ Riffy code contains "writable: false" but patch regex didn\'t match. This might be an issue.');
+            }
         }
     }
 } catch (patchError) {
-    console.warn('[LAVALINK] ⚠️ Could not apply runtime patch (non-critical):', patchError.message);
-    console.warn('[LAVALINK] ⚠️ If you see property descriptor errors, ensure patch-package ran during install');
+    console.error('[LAVALINK] ❌ Runtime patch failed:', patchError);
 }
 
 const { Client, Collection, GatewayIntentBits, Events, GatewayDispatchEvents } = require('discord.js');
