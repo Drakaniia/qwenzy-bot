@@ -47,15 +47,32 @@ const path = require('path');
 // MUST be done BEFORE requiring Riffy
 try {
     const riffyPath = require.resolve('riffy');
-    const NodePath = path.join(path.dirname(riffyPath), 'build', 'structures', 'Node.js');
+    const riffyDir = path.dirname(riffyPath);
 
-    if (fs.existsSync(NodePath)) {
+    // Try multiple possible paths for Node.js file
+    const possiblePaths = [
+        path.join(riffyDir, 'structures', 'Node.js'),
+        path.join(riffyDir, 'build', 'structures', 'Node.js'),
+        path.join(path.dirname(riffyDir), 'structures', 'Node.js'),
+        path.join(path.dirname(riffyDir), 'build', 'structures', 'Node.js')
+    ];
+
+    let NodePath = null;
+    for (const possiblePath of possiblePaths) {
+        if (fs.existsSync(possiblePath)) {
+            NodePath = possiblePath;
+            break;
+        }
+    }
+
+    if (NodePath) {
         let NodeCode = fs.readFileSync(NodePath, 'utf8');
         let modified = false;
 
         // Simple and robust approach: just remove 'writable: false' lines
         if (NodeCode.includes('writable: false')) {
             console.log('[LAVALINK] 🛠️ Found problematic Riffy code. Applying runtime patch...');
+            console.log('[LAVALINK] 📂 Patching file:', NodePath);
 
             // Remove 'writable: false,' entirely (including the line and extra whitespace)
             NodeCode = NodeCode.replace(/^\s*writable:\s*false,?\s*$/gm, '');
@@ -69,18 +86,19 @@ try {
 
             // Clear require cache to ensure the patched version is loaded
             delete require.cache[require.resolve('riffy')];
-            delete require.cache[NodePath];
         } else {
-            // Double check if it was already patched or simply doesn't match
             if (!NodeCode.includes("writable: false")) {
                 console.log('[LAVALINK] ✅ Riffy is clean (patch already applied or not needed)');
             } else {
-                console.warn('[LAVALINK] ⚠️ Riffy code contains "writable: false" but patch regex didn\'t match. This might be an issue.');
+                console.warn('[LAVALINK] ⚠️ Riffy code contains "writable: false" but patch regex didn\'t match.');
             }
         }
+    } else {
+        console.error('[LAVALINK] ❌ Could not find Riffy Node.js file to patch. Tried paths:', possiblePaths);
     }
 } catch (patchError) {
     console.error('[LAVALINK] ❌ Runtime patch failed:', patchError);
+    console.error('[LAVALINK] Stack:', patchError.stack);
 }
 
 const { Client, Collection, GatewayIntentBits, Events, GatewayDispatchEvents } = require('discord.js');
