@@ -38,11 +38,52 @@ function validateDependencies() {
 
 validateDependencies();
 
-const { Client, Collection, GatewayIntentBits, Events, GatewayDispatchEvents } = require('discord.js');
-const { Riffy } = require('riffy');
-const musicManager = require('./src/modules/musicManager');
 const fs = require('fs');
 const path = require('path');
+
+// Runtime patch for Riffy Node.js compatibility issue
+// Fixes "Invalid property descriptor" error on Node.js 20+
+// This is a fallback if patch-package doesn't apply correctly during build
+// MUST be done BEFORE requiring Riffy
+try {
+    const riffyPath = require.resolve('riffy');
+    const NodePath = path.join(path.dirname(riffyPath), 'build', 'structures', 'Node.js');
+    
+    if (fs.existsSync(NodePath)) {
+        let NodeCode = fs.readFileSync(NodePath, 'utf8');
+        // Check if the problematic code still exists (patch wasn't applied)
+        const needsPatch = NodeCode.includes('writable: false') && 
+                          NodeCode.includes('Object.defineProperty(this, "options"') &&
+                          NodeCode.includes('get()');
+        
+        if (needsPatch) {
+            console.log('[LAVALINK] Applying runtime patch for Riffy Node.js compatibility...');
+            // Remove writable: false from the options property descriptor
+            // Handle various whitespace patterns
+            NodeCode = NodeCode.replace(
+                /Object\.defineProperty\(this,\s*"options",\s*\{[\s\n]*writable:\s*false,\s*\n\s*get\(\)/,
+                'Object.defineProperty(this, "options", {\n      get()'
+            );
+            // Also try alternative format
+            NodeCode = NodeCode.replace(
+                /Object\.defineProperty\(this,\s*"options",\s*\{[^\}]*writable:\s*false,\s*[^\}]*get\(\)/,
+                (match) => match.replace(/writable:\s*false,\s*/, '')
+            );
+            fs.writeFileSync(NodePath, NodeCode, 'utf8');
+            console.log('[LAVALINK] ✅ Runtime patch applied successfully');
+        } else {
+            console.log('[LAVALINK] ✅ Riffy appears to be already patched');
+        }
+    }
+} catch (patchError) {
+    console.warn('[LAVALINK] ⚠️ Could not apply runtime patch (non-critical):', patchError.message);
+    console.warn('[LAVALINK] ⚠️ If you see property descriptor errors, ensure patch-package ran during install');
+}
+
+const { Client, Collection, GatewayIntentBits, Events, GatewayDispatchEvents } = require('discord.js');
+const { Riffy } = require('riffy');
+
+const musicManager = require('./src/modules/musicManager');
 
 // Wispbyte and similar platforms typically don't require an HTTP server
 // but it's good practice to have one for health checks
