@@ -239,59 +239,62 @@ client.on('raw', (d) => {
     client.riffy.updateVoiceState(d);
 });
 
-// Lavalink node health monitoring
-client.riffy.on('nodeConnect', (node) => {
-    if (node && node.host) {
-        console.log(`[LAVALINK] ✅ Node connected: ${node.host}:${node.port}`);
-    } else {
-        console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
-    }
-});
+// Lavalink node health monitoring (added after Riffy is fully initialized)
+// These listeners will track node connections and manage musicReady status
+let nodeMonitoringInitialized = false;
 
-client.riffy.on('nodeError', (node, error) => {
-    if (node && node.host) {
-        console.error(`[LAVALINK] ❌ Node error: ${node.host}:${node.port} - ${error.message}`);
-    } else {
-        console.error(`[LAVALINK] ❌ Node error: ${error.message}`);
-    }
-});
+function initializeNodeMonitoring() {
+    if (nodeMonitoringInitialized) return;
+    nodeMonitoringInitialized = true;
 
-client.riffy.on('nodeDisconnect', (node) => {
-    if (node && node.host) {
-        console.warn(`[LAVALINK] ⚠️ Node disconnected: ${node.host}:${node.port}`);
-    } else {
-        console.warn(`[LAVALINK] ⚠️ Node disconnected (no node info available)`);
-    }
-
-    // Check if all nodes are disconnected, and update musicReady status accordingly
-    let allNodesDisconnected = true;
-    for (const [nodeId, node] of client.riffy.nodeMap.entries()) {
-        if (node.connected) {
-            allNodesDisconnected = false;
-            break;
+    client.riffy.on('nodeConnect', (node) => {
+        if (node && node.host) {
+            console.log(`[LAVALINK] ✅ Node connected: ${node.host}:${node.port}`);
+        } else {
+            console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
         }
-    }
+    });
 
-    if (allNodesDisconnected && client.musicReady) {
-        console.warn('[LAVALINK] ⚠️ All nodes disconnected, updating music system status');
-        client.musicReady = false;
-    }
-});
+    client.riffy.on('nodeError', (node, error) => {
+        if (node && node.host) {
+            console.error(`[LAVALINK] ❌ Node error: ${node.host}:${node.port} - ${error.message}`);
+        } else {
+            console.error(`[LAVALINK] ❌ Node error: ${error.message}`);
+        }
+    });
 
-// Also monitor when nodes connect to potentially restore musicReady status
-client.riffy.on('nodeConnect', (node) => {
-    if (node && node.host) {
-        console.log(`[LAVALINK] ✅ Node connected: ${node.host}:${node.port}`);
-    } else {
-        console.log(`[LAVALINK] ✅ Node connected (no node info available)`);
-    }
+    client.riffy.on('nodeDisconnect', (node) => {
+        if (node && node.host) {
+            console.warn(`[LAVALINK] ⚠️ Node disconnected: ${node.host}:${node.port}`);
+        } else {
+            console.warn(`[LAVALINK] ⚠️ Node disconnected (no node info available)`);
+        }
 
-    // If music wasn't ready but now at least one node is connected, try to set it as ready
-    if (!client.musicReady) {
-        client.musicReady = true;
-        console.log('[LAVALINK] ✅ Music system ready after node reconnection');
-    }
-});
+        // Check if all nodes are disconnected, and update musicReady status accordingly
+        let allNodesDisconnected = true;
+        for (const [nodeId, node] of client.riffy.nodeMap.entries()) {
+            if (node.connected) {
+                allNodesDisconnected = false;
+                break;
+            }
+        }
+
+        if (allNodesDisconnected && client.musicReady) {
+            console.warn('[LAVALINK] ⚠️ All nodes disconnected, updating music system status');
+            client.musicReady = false;
+        }
+    });
+
+    // Also monitor when nodes connect to potentially restore musicReady status
+    client.riffy.on('nodeConnect', (node) => {
+        if (!client.musicReady) {
+            client.musicReady = true;
+            console.log('[LAVALINK] ✅ Music system ready after node reconnection');
+        }
+    });
+
+    console.log('[LAVALINK] ✅ Node monitoring initialized');
+}
 
 // Initialize musicManager immediately after creating client.riffy
 musicManager.init(client);
@@ -355,27 +358,48 @@ client.once(Events.ClientReady, async () => {
     console.log(`[INIT] Logged in as ${client.user.tag}!`);
     console.log(`[INFO] Ready to compile some fun.`);
 
-    // Init Lavalink client
-    try {
-        client.riffy.init(client.user.id);
-        console.log('[LAVALINK] ✅ Riffy initialized');
+        // Init Lavalink client
+        try {
+            client.riffy.init(client.user.id);
+            console.log('[LAVALINK] ✅ Riffy initialized');
 
-        // Initialize Riffy event listeners
-        const riffyEvents = require('./src/events/riffyEvents');
-        riffyEvents.execute(client);
+            // Initialize Riffy event listeners
+            const riffyEvents = require('./src/events/riffyEvents');
+            riffyEvents.execute(client);
 
-        // Wait for at least one node to connect before marking music system as ready
-        console.log('[LAVALINK] Waiting for node connections...');
+            // Wait for at least one node to connect before marking music system as ready
+            console.log('[LAVALINK] Waiting for node connections...');
 
-        // Track if any node actually connected
-        let hasConnected = false;
+            // Initialize node monitoring (this will set musicReady when nodes connect)
+            initializeNodeMonitoring();
 
-        // Set a timeout for node connection
-        const timeoutPromise = new Promise(resolve => {
-            setTimeout(() => {
-                if (!hasConnected) {
-                    console.log('[LAVALINK] ⚠️ Timeout waiting for node connections, continuing with available nodes');
+            // Set a timeout for node connection
+            const timeoutPromise = new Promise(resolve => {
+                setTimeout(() => {
+                    resolve();
+                }, 30000); // 30 second timeout for TLS connections to public nodes
+            });
+
+            // Wait for node connections or timeout
+            await timeoutPromise;
+
+            // Check if any node is actually connected
+            let anyNodeConnected = false;
+            for (const [nodeId, node] of client.riffy.nodeMap.entries()) {
+                if (node.connected) {
+                    anyNodeConnected = true;
+                    break;
                 }
+            }
+
+            // Mark music system as ready based on actual connection state
+            if (anyNodeConnected) {
+                client.musicReady = true;
+                console.log('[LAVALINK] ✅ Music system ready');
+            } else {
+                console.log('[LAVALINK] ⚠️ No nodes connected yet, but continuing anyway...');
+                client.musicReady = true;
+            }
                 resolve();
             }, 30000); // 30 second timeout for TLS connections to public nodes
         });

@@ -102,8 +102,8 @@ module.exports = {
 
         // Node error
         client.riffy.on('nodeError', (node, error) => {
-            if (node && node.options) {
-                console.error(`[LAVALINK] Node error: ${node.options.host}:${node.options.port} - ${error.message}`);
+            if (node && node.host) {
+                console.error(`[LAVALINK] Node error: ${node.host}:${node.port} - ${error.message}`);
             } else {
                 console.error(`[LAVALINK] Node error: ${error.message}`);
             }
